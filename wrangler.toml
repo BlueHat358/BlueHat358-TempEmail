@@ -25,7 +25,7 @@ class_name = "InboxBroadcaster"
 
 [[migrations]]
 tag         = "v1"
-new_classes = ["InboxBroadcaster"]
+new_sqlite_classes = ["InboxBroadcaster"]
 
 # ─── Email Routing ────────────────────────────────────────────────────────
 # Konfigurasi via Cloudflare Dashboard:
