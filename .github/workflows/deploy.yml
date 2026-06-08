@@ -1,0 +1,35 @@
+name: Deploy BlueHat358 TempMail
+
+on:
+  push:
+    branches:
+      - main        # deploy otomatis saat push ke main
+  workflow_dispatch: # bisa trigger manual dari GitHub Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write wrangler.toml (inject KV ID dari secret)
+        run: |
+          sed -i "s|GANTI_DENGAN_KV_NAMESPACE_ID|${{ secrets.KV_NAMESPACE_ID }}|g" wrangler.toml
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
