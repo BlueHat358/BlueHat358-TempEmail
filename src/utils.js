@@ -86,10 +86,11 @@ export async function getEmailRecord(env, inboxName, emailId) {
 /**
  * Save an email record with 7-day TTL
  */
-export async function saveEmailRecord(env, record) {
+export async function saveEmailRecord(env, record, ttlSec = 259200) {
+  // ttlSec default = 259200 = 3 hari (personal limit)
   const key = KV_KEYS.email(record.inboxName, record.id);
   await env.EMAILS.put(key, JSON.stringify(record), {
-    expirationTtl: 604800, // 7 days
+    expirationTtl: ttlSec,
   });
 }
 
@@ -153,7 +154,7 @@ export async function deleteAllEmails(env, inboxName) {
   await env.EMAILS.put(
     statsKey,
     JSON.stringify({ inboxName, total: 0, unread: 0, lastUpdated: Date.now() }),
-    { expirationTtl: 2592000 }
+    { expirationTtl: 1209600 }
   );
 }
 
@@ -173,7 +174,7 @@ export async function incrementStats(env, inboxName) {
   stats.unread += 1;
   stats.lastUpdated = Date.now();
   await env.EMAILS.put(key, JSON.stringify(stats), {
-    expirationTtl: 2592000,
+    expirationTtl: 1209600, // 14 hari
   });
 }
 
@@ -182,7 +183,7 @@ async function decrementUnread(env, inboxName) {
   const stats = await getStats(env, inboxName);
   stats.unread = Math.max(0, stats.unread - 1);
   await env.EMAILS.put(key, JSON.stringify(stats), {
-    expirationTtl: 2592000,
+    expirationTtl: 1209600, // 14 hari
   });
 }
 
@@ -192,7 +193,7 @@ async function updateStatsOnDelete(env, inboxName, unreadDelta) {
   stats.total = Math.max(0, stats.total - 1);
   stats.unread = Math.max(0, stats.unread - unreadDelta);
   await env.EMAILS.put(key, JSON.stringify(stats), {
-    expirationTtl: 2592000,
+    expirationTtl: 1209600, // 14 hari
   });
 }
 
