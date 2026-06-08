@@ -1,5 +1,3 @@
-.github/
-
 # Wrangler local state
 .wrangler/
 .dev.vars
