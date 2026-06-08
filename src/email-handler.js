@@ -1,7 +1,7 @@
 // src/email-handler.js — Email ingestion via Cloudflare Email Routing
 // Fase 3: broadcast SSE event ke InboxBroadcaster Durable Object setelah simpan email
 
-import { parseEmail } from "postal-mime";
+import PostalMime from "postal-mime";
 import {
   isValidInboxName,
   sanitizeInboxName,
@@ -43,7 +43,7 @@ export async function handleIncomingEmail(message, env, ctx) {
     const rawBuffer = await new Response(message.raw).arrayBuffer();
     let parsed;
     try {
-      parsed = await parseEmail(rawBuffer);
+      parsed = await PostalMime.parse(rawBuffer);
     } catch (parseErr) {
       console.error(`[email] postal-mime parse error for "${inboxName}":`, parseErr);
       return;

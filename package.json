@@ -4,14 +4,14 @@
   "description": "BlueHat358 Temporary Email Service — Cloudflare Workers (Fase 3)",
   "main": "src/index.js",
   "scripts": {
-    "dev": "wrangler dev",
+    "dev":    "wrangler dev",
     "deploy": "wrangler deploy",
-    "tail": "wrangler tail"
+    "tail":   "wrangler tail"
   },
   "dependencies": {
     "postal-mime": "^2.2.4"
   },
   "devDependencies": {
-    "wrangler": "^3.57.0"
+    "wrangler": "^4.0.0"
   }
 }

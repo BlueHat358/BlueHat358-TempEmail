@@ -23,12 +23,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Write wrangler.toml (inject KV ID dari secret)
-        run: |
-          sed -i "s|GANTI_DENGAN_KV_NAMESPACE_ID|${{ secrets.KV_NAMESPACE_ID }}|g" wrangler.toml
+      - name: Inject KV Namespace ID
+        run: sed -i "s|GANTI_DENGAN_KV_NAMESPACE_ID|${{ secrets.KV_NAMESPACE_ID }}|g" wrangler.toml
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          wranglerVersion: '4'
