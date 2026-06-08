@@ -491,6 +491,29 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
     }
   }
 
+  // GET /api/system/status — cek apakah inbox-count sudah penuh
+  if (segments[0] === "system" && segments[1] === "status" && method === "GET") {
+    const countData = await env.EMAILS.get("system:inbox-count", { type: "json" });
+    const knownInboxes = countData?.inboxes || [];
+
+    // Cek berapa yang masih aktif (punya pesan) langsung via KV list
+    const activeChecks = await Promise.all(
+      knownInboxes.map(async (name) => {
+        const listed = await env.EMAILS.list({ prefix: `inbox:${name}:`, limit: 1 });
+        return listed.keys.length > 0 ? name : null;
+      })
+    );
+    const activeInboxes = activeChecks.filter(Boolean);
+    const MAX_SLOTS = 10;
+
+    return jsonResponse({
+      total_slots: MAX_SLOTS,
+      used_slots: activeInboxes.length,
+      available_slots: Math.max(0, MAX_SLOTS - activeInboxes.length),
+      is_full: activeInboxes.length >= MAX_SLOTS,
+    }, 200);
+  }
+
   return jsonResponse({ error: "Endpoint tidak ditemukan", hint: "Periksa dokumentasi API" }, 404);
 }
 

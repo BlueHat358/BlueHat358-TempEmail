@@ -10,6 +10,7 @@ import {
   listEmailRecords,
   saveEmailRecord,
   incrementStats,
+  deleteEmail,
 } from "./utils.js";
 
 // ─────────────────────────────────────────────
@@ -47,28 +48,40 @@ export async function handleIncomingEmail(message, env, ctx) {
     // Cek apakah inbox ini baru & sudah ada terlalu banyak inbox
     const existingEmails = await listEmailRecords(env, inboxName);
     if (existingEmails.length === 0) {
-      // Inbox baru — cek total inbox di sistem
+      // Inbox kosong (baru atau semua pesannya sudah expired)
       const inboxCountKey = "system:inbox-count";
       const countData = await env.EMAILS.get(inboxCountKey, { type: "json" });
-      const knownInboxes = countData?.inboxes || [];
+      let knownInboxes = countData?.inboxes || [];
+
+      // Bersihkan alamat yang semua pesannya sudah expired dari daftar
+      const activeChecks = await Promise.all(
+        knownInboxes.map(async (name) => {
+          const msgs = await listEmailRecords(env, name);
+          return msgs.length > 0 ? name : null;
+        })
+      );
+      knownInboxes = activeChecks.filter(Boolean);
 
       if (!knownInboxes.includes(inboxName)) {
         if (knownInboxes.length >= MAX_TOTAL_INBOXES) {
           console.log(`[email] Rejected: max ${MAX_TOTAL_INBOXES} inboxes reached. Inbox "${inboxName}" is new.`);
           return;
         }
-        // Daftarkan inbox baru
         knownInboxes.push(inboxName);
-        await env.EMAILS.put(inboxCountKey, JSON.stringify({ inboxes: knownInboxes }), {
-          expirationTtl: STATS_TTL_DAYS * 24 * 60 * 60,
-        });
       }
+
+      // Simpan ulang daftar yang sudah dibersihkan
+      await env.EMAILS.put(inboxCountKey, JSON.stringify({ inboxes: knownInboxes }), {
+        expirationTtl: STATS_TTL_DAYS * 24 * 60 * 60,
+      });
     }
 
-    // ── 3. Per-inbox quota check ──────────────────────────────────────
+    // ── 3. Per-inbox quota check — FIFO, hapus pesan terlama jika penuh ──
     if (existingEmails.length >= MAX_EMAILS_PER_INBOX) {
-      console.log(`[email] Quota reached for inbox "${inboxName}" (${existingEmails.length}/${MAX_EMAILS_PER_INBOX}) — dropping`);
-      return;
+      // existingEmails sudah diurutkan terbaru dulu, jadi terlama ada di akhir
+      const oldest = existingEmails[existingEmails.length - 1];
+      await deleteEmail(env, inboxName, oldest.id);
+      console.log(`[email] FIFO: dropped oldest message ${oldest.id} from "${inboxName}"`);
     }
 
     // ── 4. Parse MIME ─────────────────────────────────────────────────

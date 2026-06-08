@@ -6,6 +6,54 @@ export function renderHomePage() {
   const body = `
     <!-- Hero section -->
     <div style="text-align:center; padding: 3rem 0 2rem;">
+
+      <!-- Banner: sistem penuh -->
+      <div id="system-full-banner" style="
+        display:none;
+        align-items:center;
+        gap:0.75rem;
+        background:color-mix(in srgb, var(--red) 15%, transparent);
+        border:1px solid var(--red);
+        border-radius:var(--radius-md);
+        padding:0.85rem 1.25rem;
+        margin-bottom:1.5rem;
+        text-align:left;
+        font-size:0.88rem;
+        color:var(--text);
+        max-width:560px;
+        margin-left:auto;
+        margin-right:auto;
+      ">
+        <span style="font-size:1.4rem;">🚫</span>
+        <div>
+          <strong style="color:var(--red);">Sistem Penuh</strong><br>
+          <span style="color:var(--subtext);">Semua slot alamat email sedang terpakai. Slot akan terbuka otomatis setelah pesan lama kedaluwarsa (3 hari). Coba lagi nanti.</span>
+        </div>
+      </div>
+
+      <!-- Banner: slot hampir habis -->
+      <div id="system-warn-banner" style="
+        display:none;
+        align-items:center;
+        gap:0.75rem;
+        background:color-mix(in srgb, var(--yellow, #f9e2af) 15%, transparent);
+        border:1px solid var(--yellow, #f9e2af);
+        border-radius:var(--radius-md);
+        padding:0.85rem 1.25rem;
+        margin-bottom:1.5rem;
+        text-align:left;
+        font-size:0.88rem;
+        color:var(--text);
+        max-width:560px;
+        margin-left:auto;
+        margin-right:auto;
+      ">
+        <span style="font-size:1.4rem;">⚠️</span>
+        <div>
+          <strong>Slot Hampir Habis</strong><br>
+          <span style="color:var(--subtext);">Hanya tersisa <strong id="available-slots">?</strong> slot alamat email. Gunakan nama yang sudah pernah dipakai jika memungkinkan.</span>
+        </div>
+      </div>
       <div style="
         display:inline-flex;
         align-items:center;
@@ -69,7 +117,7 @@ export function renderHomePage() {
             >
             <div class="input-addon">@bluehat358.biz.id</div>
           </div>
-          <button class="btn btn-primary" onclick="goToInbox()">
+          <button id="open-inbox-btn" class="btn btn-primary" onclick="goToInbox()">
             Buka Inbox →
           </button>
         </div>
@@ -174,6 +222,32 @@ export function renderHomePage() {
   return page.replace(
     "</body>",
     `<script>
+  // Cek status sistem saat halaman dimuat
+  (async function checkSystemStatus() {
+    try {
+      const res = await fetch('/api/system/status');
+      const data = await res.json();
+      if (data.is_full) {
+        var banner = document.getElementById('system-full-banner');
+        if (banner) banner.style.display = 'flex';
+        var btn = document.getElementById('open-inbox-btn');
+        if (btn) {
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'not-allowed';
+          btn.title = 'Sistem penuh, tidak bisa membuat alamat baru';
+        }
+      } else if (data.available_slots <= 2) {
+        var warn = document.getElementById('system-warn-banner');
+        if (warn) {
+          warn.style.display = 'flex';
+          var slot = document.getElementById('available-slots');
+          if (slot) slot.textContent = data.available_slots;
+        }
+      }
+    } catch(e) {}
+  })();
+
   // Validation
   function validateInput(el) {
     var val = el.value.toLowerCase().trim();
@@ -188,6 +262,11 @@ export function renderHomePage() {
   }
 
   function goToInbox() {
+    var btn = document.getElementById('open-inbox-btn');
+    if (btn && btn.disabled) {
+      showToast('Sistem penuh. Tunggu beberapa hari hingga slot tersedia.', 'error');
+      return;
+    }
     var val = document.getElementById('inbox-input').value.toLowerCase().trim();
     if (!val) { showToast('Masukkan nama inbox terlebih dahulu', 'error'); return; }
     if (val.length < 3) { showToast('Nama inbox minimal 3 karakter', 'error'); return; }
