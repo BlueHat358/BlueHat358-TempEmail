@@ -24,7 +24,7 @@ name       = "INBOX_BROADCASTER"
 class_name = "InboxBroadcaster"
 
 [[migrations]]
-tag         = "v2"
+tag         = "v1"
 new_sqlite_classes = ["InboxBroadcaster"]
 
 # ─── Email Routing ────────────────────────────────────────────────────────
