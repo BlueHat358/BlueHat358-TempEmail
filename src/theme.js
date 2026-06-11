@@ -2,8 +2,8 @@
 
 export const CATPPUCCIN_CSS = `
 /* ═══════════════════════════════════════════
-   Catppuccin — Mocha (dark) + Latte (light)
-   ═══════════════════════════════════════════ */
+ *   Catppuccin — Mocha (dark) + Latte (light)
+ *   ═══════════════════════════════════════════ */
 
 :root {
   /* Mocha (dark) — default */
@@ -72,8 +72,8 @@ html.light {
 }
 
 /* ═══════════════════════════════
-   Reset & Base
-   ═══════════════════════════════ */
+ *   Reset & Base
+ *   ═══════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
@@ -91,8 +91,8 @@ body {
 }
 
 /* ═══════════════════════════════
-   Typography
-   ═══════════════════════════════ */
+ *   Typography
+ *   ═══════════════════════════════ */
 h1, h2, h3, h4 {
   font-family: 'Space Grotesk', 'Outfit', system-ui, sans-serif;
   font-weight: 700;
@@ -113,8 +113,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Layout
-   ═══════════════════════════════ */
+ *   Layout
+ *   ═══════════════════════════════ */
 .wrapper {
   max-width: 1100px;
   margin: 0 auto;
@@ -122,8 +122,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Topbar / Header
-   ═══════════════════════════════ */
+ *   Topbar / Header
+ *   ═══════════════════════════════ */
 .topbar {
   background: var(--mantle);
   border-bottom: 1px solid var(--surface);
@@ -178,8 +178,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Theme Toggle
-   ═══════════════════════════════ */
+ *   Theme Toggle
+ *   ═══════════════════════════════ */
 .theme-btn {
   background: var(--surface);
   border: 1px solid var(--surface1);
@@ -201,8 +201,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Buttons
-   ═══════════════════════════════ */
+ *   Buttons
+ *   ═══════════════════════════════ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -272,8 +272,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Badges
-   ═══════════════════════════════ */
+ *   Badges
+ *   ═══════════════════════════════ */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -299,8 +299,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Cards
-   ═══════════════════════════════ */
+ *   Cards
+ *   ═══════════════════════════════ */
 .card {
   background: var(--surface);
   border: 1px solid var(--surface1);
@@ -310,8 +310,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Form elements
-   ═══════════════════════════════ */
+ *   Form elements
+ *   ═══════════════════════════════ */
 .input {
   background: var(--mantle);
   border: 1.5px solid var(--surface1);
@@ -350,8 +350,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Alerts / Notice
-   ═══════════════════════════════ */
+ *   Alerts / Notice
+ *   ═══════════════════════════════ */
 .alert {
   padding: 0.85rem 1.25rem;
   border-radius: var(--radius-md);
@@ -378,8 +378,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Spinner
-   ═══════════════════════════════ */
+ *   Spinner
+ *   ═══════════════════════════════ */
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -393,8 +393,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Divider
-   ═══════════════════════════════ */
+ *   Divider
+ *   ═══════════════════════════════ */
 .divider {
   border: none;
   border-top: 1px solid var(--surface1);
@@ -402,8 +402,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Footer
-   ═══════════════════════════════ */
+ *   Footer
+ *   ═══════════════════════════════ */
 .footer {
   border-top: 1px solid var(--surface);
   padding: 1.5rem 0;
@@ -416,8 +416,8 @@ code, kbd, pre {
 .footer a:hover { color: var(--accent); }
 
 /* ═══════════════════════════════
-   Toast notification
-   ═══════════════════════════════ */
+ *   Toast notification
+ *   ═══════════════════════════════ */
 .toast-container {
   position: fixed;
   bottom: 1.5rem;
@@ -450,8 +450,8 @@ code, kbd, pre {
 }
 
 /* ═══════════════════════════════
-   Responsive
-   ═══════════════════════════════ */
+ *   Responsive
+ *   ═══════════════════════════════ */
 @media (max-width: 640px) {
   html { font-size: 14px; }
   .wrapper { padding: 0 1rem; }
@@ -527,19 +527,20 @@ function confirmDelete(msg, onConfirm) {
 // ─────────────────────────────────────────────
 export function baseLayout({ title, head = "", body, inboxName = null }) {
   return `<!DOCTYPE html>
-<html lang="id">
-<head>
+  <html lang="id">
+  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(title)} — BlueHat358 TempMail</title>
   <meta name="description" content="Email sementara instan. Tanpa daftar, tanpa password.">
   <meta name="robots" content="noindex, nofollow">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&display=swap">
-  <style>${CATPPUCCIN_CSS}</style>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&display=swap');
+  ${CATPPUCCIN_CSS}
+  </style>
   ${head}
-</head>
-<body>
+  </head>
+  <body>
   <script>
   (function() {
     var saved = localStorage.getItem('theme');
@@ -550,59 +551,59 @@ export function baseLayout({ title, head = "", body, inboxName = null }) {
 
   <!-- Topbar -->
   <header class="topbar">
-    <div class="wrapper topbar-inner">
-      <a href="/" class="logo">
-        <div class="logo-icon">📬</div>
-        <div>
-          <div>BlueHat<span style="color:var(--accent)">358</span></div>
-          <div class="logo-sub">TempMail · @bluehat358.biz.id</div>
-        </div>
-      </a>
-      <div class="topbar-right">
-        ${inboxName ? `
-        <span style="font-size:0.8rem;color:var(--subtext);font-family:'JetBrains Mono',monospace;">
-          <span style="color:var(--overlay)">inbox:</span>
-          <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
-        </span>` : ""}
-        <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀️ Latte</button>
-      </div>
+  <div class="wrapper topbar-inner">
+  <a href="/" class="logo">
+  <div class="logo-icon">📬</div>
+  <div>
+  <div>BlueHat<span style="color:var(--accent)">358</span></div>
+  <div class="logo-sub">TempMail · @bluehat358.biz.id</div>
+  </div>
+  </a>
+  <div class="topbar-right">
+  ${inboxName ? `
+    <span style="font-size:0.8rem;color:var(--subtext);font-family:'JetBrains Mono',monospace;">
+    <span style="color:var(--overlay)">inbox:</span>
+    <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
+    </span>` : ""}
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀️ Latte</button>
     </div>
-  </header>
+    </div>
+    </header>
 
-  <!-- Main content -->
-  <main style="padding: 2rem 0 4rem;">
+    <!-- Main content -->
+    <main style="padding: 2rem 0 4rem;">
     <div class="wrapper">
-      ${body}
+    ${body}
     </div>
-  </main>
+    </main>
 
-  <!-- Footer -->
-  <footer class="footer">
+    <!-- Footer -->
+    <footer class="footer">
     <div class="wrapper">
-      <p>
-        <strong style="color:var(--subtext)">BlueHat358 TempMail</strong>
-        &nbsp;·&nbsp; Email otomatis dihapus setelah 7 hari
-        &nbsp;·&nbsp; <a href="/">Buat inbox baru</a>
-        &nbsp;·&nbsp; <a href="/about">Tentang & FAQ</a>
-      </p>
-      <p style="margin-top:0.4rem">
-        ⚠️ Inbox bersifat <strong>publik</strong> — jangan gunakan untuk informasi sensitif, OTP bank, atau akun penting.
-      </p>
+    <p>
+    <strong style="color:var(--subtext)">BlueHat358 TempMail</strong>
+    &nbsp;·&nbsp; Email otomatis dihapus setelah 7 hari
+    &nbsp;·&nbsp; <a href="/">Buat inbox baru</a>
+    &nbsp;·&nbsp; <a href="/about">Tentang & FAQ</a>
+    </p>
+    <p style="margin-top:0.4rem">
+    ⚠️ Inbox bersifat <strong>publik</strong> — jangan gunakan untuk informasi sensitif, OTP bank, atau akun penting.
+    </p>
     </div>
-  </footer>
+    </footer>
 
-  <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container"></div>
 
-  <script>
-  ${SHARED_JS}
-  // Set correct theme button label on load
-  document.addEventListener('DOMContentLoaded', function() {
-    var btn = document.getElementById('theme-btn');
-    if (btn) btn.textContent = getThemeLabel();
-  });
-  </script>
-</body>
-</html>`;
+    <script>
+    ${SHARED_JS}
+    // Set correct theme button label on load
+    document.addEventListener('DOMContentLoaded', function() {
+      var btn = document.getElementById('theme-btn');
+      if (btn) btn.textContent = getThemeLabel();
+    });
+      </script>
+      </body>
+      </html>`;
 }
 
 // ─────────────────────────────────────────────
@@ -611,9 +612,9 @@ export function baseLayout({ title, head = "", body, inboxName = null }) {
 export function escapeHtml(str) {
   if (!str) return "";
   return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;")
+  .replace(/'/g, "&#39;");
 }

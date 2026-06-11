@@ -224,8 +224,6 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                       }, 600);
                     };
 
-                    function handleSearch(val) { window.handleSearch(val); }
-
                     function deleteAll() {
                       var count = document.querySelectorAll('#email-list [id^="email-row-"]').length;
                       confirmDelete('Hapus semua email di inbox ini?', function() {
@@ -347,7 +345,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                       (hasAtt ? '<span class="badge badge-att">📎 ' + email.attachmentCount + '</span>' : '') +
                       '</div></a>' +
                       '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                      '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail('' + email.id + '')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                      '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(\'' + email.id + '\')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                       '</div></div>';
                     }
 
