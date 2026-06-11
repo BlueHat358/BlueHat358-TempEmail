@@ -535,7 +535,12 @@ export function baseLayout({ title, head = "", body, inboxName = null }) {
   <meta name="description" content="Email sementara instan. Tanpa daftar, tanpa password.">
   <meta name="robots" content="noindex, nofollow">
   <style>
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;700;800&display=swap');
+  body, code, pre, input, button {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, 'SF Mono', monospace;
+  }
+  h1, h2, h3, h4, .logo {
+    font-family: 'Space Grotesk', system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  }
   ${CATPPUCCIN_CSS}
   </style>
   ${head}

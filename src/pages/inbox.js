@@ -200,6 +200,9 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                     var pollInterval = null;
                     var eventSource = null;
                     var searchTimer = null;
+                    window.deleteSingleEmail = deleteSingleEmail;
+                    window.deleteAll = deleteAll;
+                    window.confirmDelete = confirmDelete;
 
                     // FIX: expose ke window agar onclick="refreshInbox()" bisa menemukan fungsi
                     // bahkan jika script di-parse setelah HTML body
@@ -334,19 +337,22 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                       var isUnread = !email.read;
                       var hasAtt = email.attachmentCount > 0;
                       var border = isUnread ? 'var(--accent)' : 'var(--surface1)';
+                      var emailIdEscaped = email.id.replace(/'/g, "\\'"); // escape single quote
                       return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
-                      '<a href="/' + encodeURIComponent(INBOX) + '/' + encodeURIComponent(email.id) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
-                      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
-                      '<div style="flex:1;min-width:0;">' +
-                      (isUnread ? '<span class="badge badge-unread" style="font-size:0.65rem;">BARU</span> ' : '') +
-                      '<span style="font-weight:' + (isUnread?'700':'500') + ';font-size:0.95rem;display:block;">' + escHtml(email.subject||'(Tanpa Judul)') + '</span>' +
-                      '<div style="color:var(--subtext);font-size:0.8rem;">' + escHtml(email.from) + '</div>' +
-                      '</div>' +
-                      (hasAtt ? '<span class="badge badge-att">📎 ' + email.attachmentCount + '</span>' : '') +
-                      '</div></a>' +
-                      '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                      '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(\'' + email.id + '\')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
-                      '</div></div>';
+                        '<a href="/' + encodeURIComponent(INBOX) + '/' + encodeURIComponent(email.id) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
+                          '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
+                            '<div style="flex:1;min-width:0;">' +
+                              (isUnread ? '<span class="badge badge-unread" style="font-size:0.65rem;">BARU</span> ' : '') +
+                              '<span style="font-weight:' + (isUnread ? '700' : '500') + ';font-size:0.95rem;display:block;">' + escHtml(email.subject || '(Tanpa Judul)') + '</span>' +
+                              '<div style="color:var(--subtext);font-size:0.8rem;">' + escHtml(email.from) + '</div>' +
+                            '</div>' +
+                            (hasAtt ? '<span class="badge badge-att">📎 ' + email.attachmentCount + '</span>' : '') +
+                          '</div>' +
+                        '</a>' +
+                        '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
+                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(\'' + emailIdEscaped + '\')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                        '</div>' +
+                      '</div>';
                     }
 
                     function escHtml(s) {
@@ -444,7 +450,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                           }
                         });
                       }
-                    });
+                    });F
                     </script>
                     </body>`
                   );
