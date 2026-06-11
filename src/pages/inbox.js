@@ -207,10 +207,50 @@ function refreshInbox() {
     btn.disabled = true;
     btn.innerHTML = '<span style="display:inline-block;animation:spin 0.6s linear infinite;">🔄</span>';
   }
-  var q = document.getElementById('search-input');
-  var qval = q ? q.value.trim() : '';
-  var target = '/' + encodeURIComponent(INBOX) + (qval ? '?q=' + encodeURIComponent(qval) : '');
-  window.location.href = target;
+  
+  // JANGAN reload page! Fetch ulang data dari API
+  fetch('/api/inbox/' + encodeURIComponent(INBOX) + '?t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.emails) {
+        // Render ulang email list
+        var list = document.getElementById('email-list');
+        if (list) {
+          if (data.emails.length === 0) {
+            list.innerHTML = '<div style="text-align:center;padding:4rem 2rem;color:var(--subtext)"><div style="font-size:3rem;margin-bottom:1rem">📭</div><p>Inbox kosong</p></div>';
+          } else {
+            // Render semua email (bukan hanya yang baru)
+            var html = '';
+            data.emails.forEach(function(email) {
+              html += buildEmailRowHtml(email);
+            });
+            list.innerHTML = html;
+          }
+          
+          // Update unread badge
+          var unreadCount = data.emails.filter(function(e) { return !e.read; }).length;
+          var badge = document.querySelector('.badge-unread');
+          if (badge && unreadCount > 0) {
+            badge.textContent = unreadCount + ' baru';
+          } else if (badge && unreadCount === 0) {
+            badge.remove();
+          }
+          
+          showToast('Inbox di-refresh (' + data.emails.length + ' email)', 'success');
+          CURRENT_TOTAL = data.total || data.emails.length;
+        }
+      }
+    })
+    .catch(function(err) {
+      console.error('Refresh error:', err);
+      showToast('Gagal refresh inbox', 'error');
+    })
+    .finally(function() {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Refresh';
+      }
+    });
 }
 
 function handleSearch(val) {
@@ -366,8 +406,8 @@ document.addEventListener('DOMContentLoaded', function() {
       eventSource.addEventListener('new-email', function(e) {
         setSseStatus('new', '📬 Email baru masuk!');
         showToast('Email baru dari ' + (JSON.parse(e.data||'{}').from||'seseorang') + '!', 'success');
-        // Auto-refresh email list setelah jeda singkat
-        setTimeout(function() { refreshEmailList(); }, 800);
+        // LANGSUNG panggil refreshInbox() buat langsung tampil
+        setTimeout(function() { refreshInbox(); }, 800);
       });
       // Email dihapus dari sesi lain
       eventSource.addEventListener('email-deleted', function(e) {
@@ -429,6 +469,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 });
+
+// EXPOSE ke global (tetap diperlukan)
+window.refreshInbox = refreshInbox;
+window.handleSearch = handleSearch;
+window.deleteAll = deleteAll;
+window.deleteSingleEmail = deleteSingleEmail;
+window.setSseStatus = setSseStatus;
+window.refreshEmailList = refreshEmailList;
+window.buildEmailRowHtml = buildEmailRowHtml;
+window.startPolling = startPolling;
+window.escHtml = escHtml;
+// showToast dan copyToClipboard, confirmDelete sudah dari theme.js, tapi amankan juga
+window.showToast = showToast;
+window.copyToClipboard = copyToClipboard;
+window.confirmDelete = confirmDelete;
 </script>
 </body>`
   );
