@@ -76,7 +76,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
     color:var(--subtext);
     font-size:0.8rem;
     ">
-    <span>📧 ${emails.length}${searchQuery ? ` dari ${totalEmails}` : ""} email</span>
+    <span id="email-count-display">📧 ${emails.length}${searchQuery ? ` dari ${totalEmails}` : ""} email</span>
     ${unread > 0
       ? `<span style="color:var(--accent)">● ${unread} belum dibaca</span>`
       : '<span style="color:var(--green)">✓ Semua terbaca</span>'}
@@ -149,7 +149,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
           "
           >
           ${searchQuery
-            ? `<a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" style="
+            ? `<a id="search-clear-link" href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" style="
             color:var(--overlay);
             font-size:0.8rem;
             text-decoration:none;
@@ -158,7 +158,16 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
             background:var(--surface1);
             border-radius:var(--radius-sm);
             ">✕ Hapus</a>`
-            : ""}
+            : `<a id="search-clear-link" href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" style="
+            color:var(--overlay);
+            font-size:0.8rem;
+            text-decoration:none;
+            white-space:nowrap;
+            padding:0.25rem 0.6rem;
+            background:var(--surface1);
+            border-radius:var(--radius-sm);
+            display:none;
+            ">✕ Hapus</a>`}
             </div>
 
 ${searchQuery
@@ -243,10 +252,19 @@ ${searchQuery
                     window.handleSearch = function handleSearch(val) {
                       clearTimeout(searchTimer);
                       searchTimer = setTimeout(function() {
-                        var q = val.trim();
-                        var target = '/' + encodeURIComponent(INBOX_LOCAL) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
-                        window.location.href = target;
-                      }, 600);
+                        var q = val.trim().toLowerCase();
+                        var rows = document.querySelectorAll('#email-list [id^="email-row-"]');
+                        var visible = 0;
+                        rows.forEach(function(row) {
+                          var text = row.textContent.toLowerCase();
+                          var match = !q || text.includes(q);
+                          row.style.display = match ? '' : 'none';
+                          if (match) visible++;
+                        });
+                        updateSearchSummary(q, visible);
+                        var clearLink = document.getElementById('search-clear-link');
+                        if (clearLink) clearLink.style.display = q ? '' : 'none';
+                      }, 200);
                     };
 
                     function deleteAll() {
@@ -258,6 +276,8 @@ ${searchQuery
                             document.getElementById('email-list').innerHTML = '<div style="text-align:center;padding:4rem 2rem;color:var(--subtext)"><div style="font-size:3rem;margin-bottom:1rem">📭</div><p>Inbox kosong</p></div>';
                             showToast('Semua email dihapus', 'success');
                             CURRENT_TOTAL = 0;
+                            var countEl = document.getElementById('email-count-display');
+                            if (countEl) countEl.textContent = '📧 0 email';
                           } else {
                             showToast('Gagal menghapus email', 'error');
                           }
@@ -287,6 +307,8 @@ ${searchQuery
                             }
                             showToast('Email dihapus', 'success');
                             CURRENT_TOTAL = Math.max(0, CURRENT_TOTAL - 1);
+                            var countEl = document.getElementById('email-count-display');
+                            if (countEl) countEl.textContent = '📧 ' + CURRENT_TOTAL + ' email';
                           } else {
                             showToast('Gagal menghapus', 'error');
                           }
@@ -537,12 +559,11 @@ ${searchQuery
                         si.addEventListener('keydown', function(e) {
                           if (e.key === 'Enter') {
                             clearTimeout(searchTimer);
-                            var q = si.value.trim();
-                            window.location.href = '/' + encodeURIComponent(INBOX_LOCAL) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
+                            handleSearch(si.value);
                           }
                           if (e.key === 'Escape') {
                             si.value = '';
-                            window.location.href = '/' + encodeURIComponent(INBOX_LOCAL) + '?domain=' + encodeURIComponent(DOMAIN);
+                            handleSearch('');
                           }
                         });
                       }
