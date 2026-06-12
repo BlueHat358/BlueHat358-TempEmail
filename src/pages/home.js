@@ -106,30 +106,6 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
           margin-bottom:0.75rem;
         ">Nama Inbox</label>
 
-        <!-- Domain Selector -->
-        <div style="margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-          <label for="domain-select" style="
-            font-size:0.8rem;
-            color:var(--subtext);
-            font-weight:500;
-          ">Pilih domain:</label>
-          <select id="domain-select" onchange="updateDomainDisplay()" style="
-            background:var(--mantle);
-            border:1.5px solid var(--surface1);
-            border-radius:var(--radius-md);
-            color:var(--text);
-            font-family:'JetBrains Mono',monospace;
-            font-size:0.9rem;
-            padding:0.5rem 0.75rem;
-            outline:none;
-            cursor:pointer;
-            flex:1;
-            min-width:200px;
-          ">
-            ${domainOptions}
-          </select>
-        </div>
-
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           <div class="input-group" style="flex:1;min-width:220px;">
             <input
@@ -146,7 +122,22 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
               oninput="validateInput(this)"
               style="border-radius: var(--radius-md) 0 0 var(--radius-md);"
             >
-            <div class="input-addon" id="domain-suffix">@${escapeHtml(currentDomain)}</div>
+            <div class="input-addon" id="domain-suffix">
+              @
+              <select id="domain-select" onchange="updateDomainDisplay()" style="
+                background:transparent;
+                border:none;
+                color:var(--text);
+                font-family:'JetBrains Mono',monospace;
+                font-size:0.9rem;
+                padding:0;
+                outline:none;
+                cursor:pointer;
+                min-width:120px;
+              ">
+                ${domainOptions}
+              </select>
+            </div>
           </div>
           <button id="open-inbox-btn" class="btn btn-primary" onclick="goToInbox()">
             Buka Inbox →
@@ -291,8 +282,6 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   function updateDomainDisplay() {
     var sel = document.getElementById('domain-select');
     var domain = sel ? sel.value : CURRENT_DOMAIN;
-    var suffix = document.getElementById('domain-suffix');
-    if (suffix) suffix.textContent = '@' + domain;
     var hero = document.getElementById('hero-domain-display');
     if (hero) hero.textContent = '@' + domain;
     CURRENT_DOMAIN = domain;
