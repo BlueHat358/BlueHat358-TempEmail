@@ -45,7 +45,9 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
     <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
     <span style="color:var(--subtext);font-weight:400;">@bluehat358.biz.id</span>
     </h1>
-    ${unread > 0 ? `<span class="badge badge-unread">${unread} baru</span>` : ""}
+    <span id="unread-badge" class="badge badge-unread" style="${unread > 0 ? "" : "display:none;"}">
+      ${unread > 0 ? `${unread} baru` : ""}
+    </span>
     </div>
 
     <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
@@ -152,18 +154,18 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
             : ""}
             </div>
 
-            ${searchQuery
-              ? `<div style="
-              font-size:0.8rem;
-              color:var(--subtext);
-              margin-bottom:0.75rem;
-              padding:0 0.25rem;
-              ">
-              ${emails.length > 0
-                ? `Menampilkan <strong style="color:var(--text)">${emails.length}</strong> hasil untuk "<span style="color:var(--accent)">${escapeHtml(searchQuery)}</span>"`
-                : "Tidak ada hasil"}
-                </div>`
-                : ""}
+${searchQuery
+  ? `<div id="search-summary" style="
+  font-size:0.8rem;
+  color:var(--subtext);
+  margin-bottom:0.75rem;
+  padding:0 0.25rem;
+  ">
+  ${emails.length > 0
+    ? `Menampilkan <strong style="color:var(--text)">${emails.length}</strong> hasil untuk "<span style="color:var(--accent)">${escapeHtml(searchQuery)}</span>"`
+    : "Tidak ada hasil"}
+    </div>`
+    : `<div id="search-summary" style="display:none;"></div>`}
 
                 <!-- Email list -->
                 <div id="email-list">
@@ -208,14 +210,18 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                     // bahkan jika script di-parse setelah HTML body
                     window.refreshInbox = function refreshInbox() {
                       var btn = document.getElementById('refresh-btn');
-                      if (btn) {
+                      if (btn && !btn.disabled) {
+                        btn.dataset.originalHtml = btn.innerHTML;
                         btn.disabled = true;
                         btn.innerHTML = '<span style="display:inline-block;animation:spin 0.6s linear infinite;">🔄</span>';
                       }
-                      var q = document.getElementById('search-input');
-                      var qval = q ? q.value.trim() : '';
-                      var target = '/' + encodeURIComponent(INBOX) + (qval ? '?q=' + encodeURIComponent(qval) : '');
-                      window.location.href = target;
+                      return refreshEmailList().finally(function() {
+                        if (btn) {
+                          btn.disabled = false;
+                          btn.innerHTML = btn.dataset.originalHtml || '🔄 Refresh';
+                          delete btn.dataset.originalHtml;
+                        }
+                      });
                     };
 
                     window.handleSearch = function handleSearch(val) {
@@ -282,55 +288,68 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                       txt.textContent = text;
                     }
 
+                    function getSearchQuery() {
+                      var inp = document.getElementById('search-input');
+                      return inp ? inp.value.trim() : '';
+                    }
+
+                    function updateSearchSummary(query, count) {
+                      var summary = document.getElementById('search-summary');
+                      if (!summary) return;
+                      if (!query) {
+                        summary.style.display = 'none';
+                        summary.innerHTML = '';
+                      } else {
+                        summary.style.display = '';
+                        if (count > 0) {
+                          summary.innerHTML = 'Menampilkan <strong style="color:var(--text)">' + count + '</strong> hasil untuk "<span style="color:var(--accent)">' + escHtml(query) + '</span>"';
+                        } else {
+                          summary.innerHTML = 'Tidak ada hasil';
+                        }
+                      }
+                    }
+
+                    function updateUnreadBadge(emails) {
+                      var unreadCount = (emails || []).filter(function(e) { return !e.read; }).length;
+                      var badge = document.getElementById('unread-badge');
+                      if (!badge) return;
+                      badge.textContent = unreadCount > 0 ? unreadCount + ' baru' : '';
+                      badge.style.display = unreadCount > 0 ? '' : 'none';
+                    }
+
+                    function renderEmptyList() {
+                      return '<div style="text-align:center;padding:4rem 2rem;color:var(--subtext)"><div style="font-size:3rem;margin-bottom:1rem">📭</div><p>Inbox kosong</p></div>';
+                    }
+
                     function refreshEmailList() {
-                      fetch('/api/inbox/' + encodeURIComponent(INBOX))
-                      .then(function(r) { return r.json(); })
+                      var q = getSearchQuery();
+                      var target = '/api/inbox/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) : '');
+                      return fetch(target)
+                      .then(function(r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json();
+                      })
                       .then(function(data) {
                         if (!data.emails) return;
                         CURRENT_TOTAL = data.total || 0;
                         var list = document.getElementById('email-list');
-                        if (!list) return;
-                        if (data.emails.length === 0) {
-                          list.innerHTML = '<div style="text-align:center;padding:4rem 2rem;color:var(--subtext)"><div style="font-size:3rem;margin-bottom:1rem">📭</div><p>Inbox kosong</p></div>';
-                          return;
+                        if (list) {
+                          list.innerHTML = data.emails.length > 0
+                            ? data.emails.map(buildEmailRowHtml).join('')
+                            : renderEmptyList();
                         }
-                        // Tambahkan email baru ke atas list (yang belum ada di DOM)
-                        var added = 0;
-                        data.emails.forEach(function(email) {
-                          if (!document.getElementById('email-row-' + email.id)) {
-                            var tmp = document.createElement('div');
-                            tmp.innerHTML = buildEmailRowHtml(email);
-                            var newRow = tmp.firstChild;
-                            newRow.style.opacity = '0';
-                            newRow.style.transform = 'translateY(-8px)';
-                            newRow.style.transition = 'opacity 0.3s, transform 0.3s';
-                            list.prepend(newRow);
-                            added++;
-                            setTimeout(function() {
-                              newRow.style.opacity = '1';
-                              newRow.style.transform = 'translateY(0)';
-                            }, 50);
-                          }
-                        });
-                        // Update badge unread
-                        var unreadCount = data.emails.filter(function(e) { return !e.read; }).length;
-                        var badge = document.getElementById('unread-badge');
-                        if (badge) {
-                          badge.textContent = unreadCount > 0 ? unreadCount + ' baru' : '';
-                          badge.style.display = unreadCount > 0 ? '' : 'none';
-                        }
-                        // FIX: kembalikan status indicator setelah email baru berhasil ditampilkan
-                        if (added > 0) {
-                          setTimeout(function() {
-                            if (eventSource && eventSource.readyState === 1) {
-                              setSseStatus('connected', '🟢 Terhubung — update real-time aktif');
-                            } else {
-                              setSseStatus('polling', '🟡 Polling mode — cek email baru setiap 20 detik');
-                            }
-                          }, 2500);
+                        updateUnreadBadge(data.emails);
+                        updateSearchSummary(q, data.emails.length);
+                        if (eventSource && eventSource.readyState === 1) {
+                          setSseStatus('connected', '🟢 Terhubung — update real-time aktif');
+                        } else {
+                          setSseStatus('polling', '🟡 Polling mode — cek email baru setiap 20 detik');
                         }
                       })
-                      .catch(function() {});
+                      .catch(function(err) {
+                        console.error('refreshEmailList error', err);
+                        showToast('Gagal memuat email', 'error');
+                      });
                     }
 
                     function buildEmailRowHtml(email) {
@@ -450,7 +469,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
                           }
                         });
                       }
-                    });F
+                    });
                     </script>
                     </body>`
                   );

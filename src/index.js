@@ -57,7 +57,7 @@ async function handleRequest(request, env, ctx) {
   // ── CORS check untuk DELETE ──────────────────────────────────────
   if (method === "DELETE") {
     const origin  = request.headers.get("Origin") || "";
-    const allowed = ["https://bluehat358.biz.id", "http://localhost:8787"];
+    const allowed = ["https://bluehat358.biz.id", "http://localhost:8787", url.origin];
     if (origin && !allowed.some((a) => origin.startsWith(a))) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }

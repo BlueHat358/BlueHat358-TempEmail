@@ -235,14 +235,15 @@ if (htmlBody) {
 }
 
 // Tab switching
-function switchTab(id) {
+window.switchTab = function switchTab(id) {
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
   document.getElementById('btn-' + id).classList.add('active');
   document.getElementById('panel-' + id).style.display = 'block';
-}
+};
 
-function deleteThisEmail() {
+// Delete helper
+window.deleteThisEmail = function deleteThisEmail() {
   confirmDelete('Hapus email ini?', function() {
     fetch('/api/inbox/' + INBOX + '/' + EMAIL_ID, { method: 'DELETE' })
       .then(function(r) {
@@ -256,8 +257,8 @@ function deleteThisEmail() {
         }
       })
       .catch(function() { showToast('Gagal menghapus', 'error'); });
-}
-}
+  });
+};
 </script>
 </body>`
   );
