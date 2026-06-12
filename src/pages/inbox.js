@@ -7,7 +7,9 @@ import { timeAgo, formatBytes, formatExpiry, isExpiringSoon } from "../utils.js"
 
 export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { domains = [], domain = "" } = {}) {
   const currentDomain = domain || domains[0] || "bluehat358.biz.id";
-  const emailAddr = `${inboxName}@${currentDomain}`;
+  // inboxName mungkin sudah "local@domain" — ambil hanya local part untuk display
+  const localPart = inboxName.includes("@") ? inboxName.split("@")[0] : inboxName;
+  const emailAddr = `${localPart}@${currentDomain}`;
   const unread = emails.filter((e) => !e.read).length;
   const totalEmails = stats.total || emails.length;
 
@@ -44,7 +46,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
     <div>
     <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;flex-wrap:wrap;">
     <h1 style="font-size:1.5rem;">
-    <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
+    <span style="color:var(--accent)">${escapeHtml(localPart)}</span>
     <span style="color:var(--subtext);font-weight:400;">@${escapeHtml(currentDomain)}</span>
     </h1>
     <span id="unread-badge" class="badge badge-unread" style="${unread > 0 ? "" : "display:none;"}">
@@ -194,7 +196,7 @@ ${searchQuery
                   `;
 
                   const page = baseLayout({
-                    title: `Inbox: ${inboxName}`,
+                    title: `Inbox: ${localPart}`,
                     inboxName,
                     body,
                     brandDomain: currentDomain,
