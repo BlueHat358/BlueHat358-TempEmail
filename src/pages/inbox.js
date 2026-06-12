@@ -89,11 +89,9 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
         <button class="btn btn-sm btn-secondary" onclick="refreshInbox()" id="refresh-btn">
         🔄 Refresh
         </button>
-        ${unread > 0
-          ? `<button class="btn btn-sm btn-primary" id="mark-all-read-btn" onclick="markAllRead()">
-          ✅ Tandai Semua Dibaca
-          </button>`
-          : ""}
+        <button class="btn btn-sm btn-primary" id="mark-all-read-btn" onclick="markAllRead()" ${unread > 0 ? "" : 'style="display:none;"'}>
+        ✅ Tandai Semua Dibaca
+        </button>
         ${emails.length > 0
           ? `<button class="btn btn-sm btn-danger" onclick="deleteAll()">
           🗑️ Hapus Semua
@@ -380,9 +378,14 @@ ${searchQuery
                     function updateUnreadBadge(emails) {
                       var unreadCount = (emails || []).filter(function(e) { return !e.read; }).length;
                       var badge = document.getElementById('unread-badge');
-                      if (!badge) return;
-                      badge.textContent = unreadCount > 0 ? unreadCount + ' baru' : '';
-                      badge.style.display = unreadCount > 0 ? '' : 'none';
+                      if (badge) {
+                        badge.textContent = unreadCount > 0 ? unreadCount + ' baru' : '';
+                        badge.style.display = unreadCount > 0 ? '' : 'none';
+                      }
+                      var markBtn = document.getElementById('mark-all-read-btn');
+                      if (markBtn) {
+                        markBtn.style.display = unreadCount > 0 ? '' : 'none';
+                      }
                     }
 
                     function renderEmptyList() {
@@ -439,7 +442,7 @@ ${searchQuery
                           '</div>' +
                         '</a>' +
                         '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent(' + emailIdEscaped + '))" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                          '<button class="btn btn-sm btn-ghost" data-action="delete" data-id="' + emailIdEscaped + '" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                         '</div>' +
                       '</div>';
                     }
@@ -515,6 +518,14 @@ ${searchQuery
                           if (inp) { inp.focus(); inp.select(); }
                         }
                       });
+                    });
+
+                    document.addEventListener('click', function(e) {
+                      var btn = e.target.closest('[data-action="delete"]');
+                      if (!btn) return;
+                      e.stopPropagation();
+                      var id = decodeURIComponent(btn.dataset.id);
+                      deleteSingleEmail(id);
                     });
 
                     document.addEventListener('DOMContentLoaded', function() {
@@ -600,7 +611,8 @@ function renderEmailRow(inboxName, email, currentDomain) {
   ">
   <button
   class="btn btn-sm btn-ghost"
-  onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent('${encodeURIComponent(email.id)}'))"
+  data-action="delete"
+  data-id="${encodeURIComponent(email.id)}"
   style="color:var(--red);font-size:0.75rem;"
   >🗑️ Hapus</button>
   </div>
