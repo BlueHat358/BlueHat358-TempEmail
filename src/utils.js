@@ -107,6 +107,34 @@ export async function markEmailRead(env, inboxName, emailId) {
 }
 
 /**
+ * Mark all emails in an inbox as read
+ */
+export async function markAllEmailsRead(env, inboxName) {
+  const emails = await listEmailRecords(env, inboxName);
+  let marked = 0;
+
+  for (const email of emails) {
+    if (!email.read) {
+      email.read = true;
+      await saveEmailRecord(env, email);
+      marked++;
+    }
+  }
+
+  // Reset unread count to 0
+  if (marked > 0) {
+    const key = KV_KEYS.stats(inboxName);
+    const stats = await getStats(env, inboxName);
+    stats.unread = 0;
+    await env.EMAILS.put(key, JSON.stringify(stats), {
+      expirationTtl: 1209600, // 14 hari
+    });
+  }
+
+  return marked;
+}
+
+/**
  * Delete a single email and all its attachments
  */
 export async function deleteEmail(env, inboxName, emailId) {

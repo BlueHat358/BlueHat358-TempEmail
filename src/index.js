@@ -17,6 +17,7 @@ import {
   getEmailRecord,
   getStats,
   markEmailRead,
+  markAllEmailsRead,
   deleteEmail,
   deleteAllEmails,
   jsonResponse,
@@ -450,6 +451,24 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
     ctx.waitUntil(broadcastEmailDeleted(env, inboxName, emailId));
 
     return new Response(null, { status: 204 });
+  }
+
+  // POST /api/inbox/{name}/mark-read — tandai semua email dibaca
+  if (segments[0] === "inbox" && segments.length === 3 && segments[2] === "mark-read" && method === "POST") {
+    const rl = await checkRateLimit(env, "api", ip);
+    if (!rl.allowed) {
+      return jsonResponse(
+        { error: "Terlalu banyak request", retryAfter: rl.resetIn },
+        429,
+        { "Retry-After": String(rl.resetIn), ...rateLimitHeaders("api", rl) }
+      );
+    }
+
+    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
+
+    const marked = await markAllEmailsRead(env, inboxName);
+    return jsonResponse({ marked, inbox: inboxName }, 200, rateLimitHeaders("api", rl));
   }
 
   // DELETE /api/inbox/{name} — hapus semua email

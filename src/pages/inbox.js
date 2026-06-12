@@ -89,6 +89,11 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
         <button class="btn btn-sm btn-secondary" onclick="refreshInbox()" id="refresh-btn">
         🔄 Refresh
         </button>
+        ${unread > 0
+          ? `<button class="btn btn-sm btn-primary" id="mark-all-read-btn" onclick="markAllRead()">
+          ✅ Tandai Semua Dibaca
+          </button>`
+          : ""}
         ${emails.length > 0
           ? `<button class="btn btn-sm btn-danger" onclick="deleteAll()">
           🗑️ Hapus Semua
@@ -208,6 +213,7 @@ ${searchQuery
                     var searchTimer = null;
                     window.deleteSingleEmail = deleteSingleEmail;
                     window.deleteAll = deleteAll;
+                    window.markAllRead = markAllRead;
                     window.confirmDelete = confirmDelete;
 
                     // Helper to build URL with domain param
@@ -288,6 +294,59 @@ ${searchQuery
                       });
                     }
 
+                    function markAllRead() {
+                      var btn = document.getElementById('mark-all-read-btn');
+                      if (btn) {
+                        btn.disabled = true;
+                        btn.textContent = '⏳ Menandai...';
+                      }
+
+                      fetch('/api/inbox/' + encodeURIComponent(INBOX) + '/mark-read', { method: 'POST' })
+                      .then(function(r) {
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        return r.json();
+                      })
+                      .then(function(data) {
+                        // Update unread badge
+                        var badge = document.getElementById('unread-badge');
+                        if (badge) {
+                          badge.textContent = '';
+                          badge.style.display = 'none';
+                        }
+
+                        // Remove all "BARU" badges and unread styling from email rows
+                        var rows = document.querySelectorAll('#email-list [id^="email-row-"]');
+                        rows.forEach(function(row) {
+                          // Remove BARU badge
+                          var badges = row.querySelectorAll('.badge-unread');
+                          badges.forEach(function(b) { b.remove(); });
+                          // Reset border to default
+                          row.style.borderColor = 'var(--surface1)';
+                          row.style.borderLeftColor = 'var(--surface1)';
+                          // Reset font weight on subject
+                          var subjectSpan = row.querySelector('span[style*="font-weight"]');
+                          if (subjectSpan) {
+                            subjectSpan.style.fontWeight = '500';
+                          }
+                        });
+
+                        // Hide the mark-all-read button itself
+                        if (btn) {
+                          btn.style.display = 'none';
+                        }
+
+                        showToast(data.marked + ' email ditandai sudah dibaca', 'success');
+                      })
+                      .catch(function(err) {
+                        console.error('markAllRead error', err);
+                        showToast('Gagal menandai email', 'error');
+                        if (btn) {
+                          btn.disabled = false;
+                          btn.textContent = '✅ Tandai Semua Dibaca';
+                        }
+                      });
+                    }
+
                     function setSseStatus(type, text) {
                       var dot = document.getElementById('sse-dot');
                       var txt = document.getElementById('sse-text');
@@ -365,7 +424,7 @@ ${searchQuery
                       var isUnread = !email.read;
                       var hasAtt = email.attachmentCount > 0;
                       var border = isUnread ? 'var(--accent)' : 'var(--surface1)';
-                      var emailIdEscaped = email.id.replace(/&/g, '&amp;').replace(/'/g, '&#39;');
+                      var emailIdEscaped = encodeURIComponent(email.id);
                       var inboxEnc = encodeURIComponent(INBOX);
                       var emailEnc = encodeURIComponent(email.id);
                       return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
@@ -380,7 +439,7 @@ ${searchQuery
                           '</div>' +
                         '</a>' +
                         '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(\'' + emailIdEscaped + \'')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent(\'' + emailIdEscaped + '\'))" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                         '</div>' +
                       '</div>';
                     }
@@ -541,7 +600,7 @@ function renderEmailRow(inboxName, email, currentDomain) {
   ">
   <button
   class="btn btn-sm btn-ghost"
-  onclick="event.stopPropagation();deleteSingleEmail('${escapeHtml(email.id)}')"
+  onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent('${encodeURIComponent(email.id)}'))"
   style="color:var(--red);font-size:0.75rem;"
   >🗑️ Hapus</button>
   </div>
