@@ -1,11 +1,13 @@
 // src/pages/inbox.js — Inbox page: list emails, search, copy address, delete all
 // Fase 2: search filter, expiry indicator, improved UX
+// Fase: multi-domain support
 
 import { baseLayout, escapeHtml } from "../theme.js";
 import { timeAgo, formatBytes, formatExpiry, isExpiringSoon } from "../utils.js";
 
-export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
-  const emailAddr = `${inboxName}@bluehat358.biz.id`;
+export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { domains = [], domain = "" } = {}) {
+  const currentDomain = domain || domains[0] || "bluehat358.biz.id";
+  const emailAddr = `${inboxName}@${currentDomain}`;
   const unread = emails.filter((e) => !e.read).length;
   const totalEmails = stats.total || emails.length;
 
@@ -22,11 +24,11 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
   </p>
   <p style="font-size:0.875rem;">
   ${searchQuery
-    ? `<a href="/${encodeURIComponent(inboxName)}" style="color:var(--accent)">Hapus filter pencarian</a>`
+    ? `<a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" style="color:var(--accent)">Hapus filter pencarian</a>`
     : `Kirim email ke <code style="color:var(--accent)">${escapeHtml(emailAddr)}</code> untuk mulai.`}
     </p>
     </div>`
-    : emails.map((email) => renderEmailRow(inboxName, email)).join("");
+    : emails.map((email) => renderEmailRow(inboxName, email, currentDomain)).join("");
 
     const body = `
     <!-- Inbox header -->
@@ -43,7 +45,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
     <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;flex-wrap:wrap;">
     <h1 style="font-size:1.5rem;">
     <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
-    <span style="color:var(--subtext);font-weight:400;">@bluehat358.biz.id</span>
+    <span style="color:var(--subtext);font-weight:400;">@${escapeHtml(currentDomain)}</span>
     </h1>
     <span id="unread-badge" class="badge badge-unread" style="${unread > 0 ? "" : "display:none;"}">
       ${unread > 0 ? `${unread} baru` : ""}
@@ -142,7 +144,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "") {
           "
           >
           ${searchQuery
-            ? `<a href="/${encodeURIComponent(inboxName)}" style="
+            ? `<a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" style="
             color:var(--overlay);
             font-size:0.8rem;
             text-decoration:none;
@@ -192,12 +194,14 @@ ${searchQuery
                     title: `Inbox: ${inboxName}`,
                     inboxName,
                     body,
+                    brandDomain: currentDomain,
                   });
 
                   return page.replace(
                     "</body>",
                     `<script>
                     var INBOX = '${escapeHtml(inboxName)}';
+                    var DOMAIN = '${escapeHtml(currentDomain)}';
                     var CURRENT_TOTAL = ${totalEmails};
                     var pollInterval = null;
                     var eventSource = null;
@@ -205,6 +209,11 @@ ${searchQuery
                     window.deleteSingleEmail = deleteSingleEmail;
                     window.deleteAll = deleteAll;
                     window.confirmDelete = confirmDelete;
+
+                    // Helper to build URL with domain param
+                    function withDomain(path) {
+                      return path + (path.indexOf('?') === -1 ? '?' : '&') + 'domain=' + encodeURIComponent(DOMAIN);
+                    }
 
                     // FIX: expose ke window agar onclick="refreshInbox()" bisa menemukan fungsi
                     // bahkan jika script di-parse setelah HTML body
@@ -228,7 +237,7 @@ ${searchQuery
                       clearTimeout(searchTimer);
                       searchTimer = setTimeout(function() {
                         var q = val.trim();
-                        var target = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) : '');
+                        var target = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
                         window.location.href = target;
                       }, 600);
                     };
@@ -356,9 +365,11 @@ ${searchQuery
                       var isUnread = !email.read;
                       var hasAtt = email.attachmentCount > 0;
                       var border = isUnread ? 'var(--accent)' : 'var(--surface1)';
-                      var emailIdEscaped = email.id.replace(/&/g, '&amp;').replace(/'/g, '&apos;'); // escape untuk HTML attribute
+                      var emailIdEscaped = email.id.replace(/&/g, '&').replace(/'/g, ''');
+                      var inboxEnc = encodeURIComponent(INBOX);
+                      var emailEnc = encodeURIComponent(email.id);
                       return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
-                        '<a href="/' + encodeURIComponent(INBOX) + '/' + encodeURIComponent(email.id) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
+                        '<a href="/' + inboxEnc + '/' + emailEnc + '?domain=' + encodeURIComponent(DOMAIN) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
                           '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
                             '<div style="flex:1;min-width:0;">' +
                               (isUnread ? '<span class="badge badge-unread" style="font-size:0.65rem;">BARU</span> ' : '') +
@@ -369,14 +380,14 @@ ${searchQuery
                           '</div>' +
                         '</a>' +
                         '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(&apos;' + emailIdEscaped + '&apos;)" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail('' + emailIdEscaped + '')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                         '</div>' +
                       '</div>';
                     }
 
                     function escHtml(s) {
                       if (!s) return '';
-                      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                      return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');
                     }
 
                     function startPolling() {
@@ -388,7 +399,6 @@ ${searchQuery
                           if (data.total > CURRENT_TOTAL) {
                             setSseStatus('new', '📬 Email baru masuk!');
                             showToast('Ada email baru!', 'success');
-                            // FIX: auto-refresh list langsung (bukan hanya notifikasi)
                             setTimeout(function() { refreshEmailList(); }, 400);
                           }
                         })
@@ -403,14 +413,11 @@ ${searchQuery
                           eventSource.onopen = function() {
                             setSseStatus('connected', '🟢 Terhubung — update real-time aktif');
                           };
-                          // Email baru masuk — tampilkan notifikasi + auto-refresh list
                           eventSource.addEventListener('new-email', function(e) {
                             setSseStatus('new', '📬 Email baru masuk!');
                             showToast('Email baru dari ' + (JSON.parse(e.data||'{}').from||'seseorang') + '!', 'success');
-                            // Auto-refresh email list setelah jeda singkat
                             setTimeout(function() { refreshEmailList(); }, 800);
                           });
-                          // Email dihapus dari sesi lain
                           eventSource.addEventListener('email-deleted', function(e) {
                             try {
                               var d = JSON.parse(e.data || '{}');
@@ -429,7 +436,6 @@ ${searchQuery
                             eventSource.close();
                             startPolling();
                           };
-                          // Timeout jika SSE tidak konek dalam 5 detik
                           setTimeout(function() {
                             if (eventSource.readyState !== 1) {
                               eventSource.close();
@@ -443,7 +449,6 @@ ${searchQuery
                         startPolling();
                       }
 
-                      // Search input keyboard shortcut
                       document.addEventListener('keydown', function(e) {
                         if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                           e.preventDefault();
@@ -453,7 +458,6 @@ ${searchQuery
                       });
                     });
 
-                    // Keyboard: Enter in search box
                     document.addEventListener('DOMContentLoaded', function() {
                       var si = document.getElementById('search-input');
                       if (si) {
@@ -461,11 +465,11 @@ ${searchQuery
                           if (e.key === 'Enter') {
                             clearTimeout(searchTimer);
                             var q = si.value.trim();
-                            window.location.href = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) : '');
+                            window.location.href = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
                           }
                           if (e.key === 'Escape') {
                             si.value = '';
-                            window.location.href = '/' + encodeURIComponent(INBOX);
+                            window.location.href = '/' + encodeURIComponent(INBOX) + '?domain=' + encodeURIComponent(DOMAIN);
                           }
                         });
                       }
@@ -475,7 +479,7 @@ ${searchQuery
                   );
 }
 
-function renderEmailRow(inboxName, email) {
+function renderEmailRow(inboxName, email, currentDomain) {
   const ago = timeAgo(email.receivedAt);
   const hasAtt = email.attachments && email.attachments.length > 0;
   const isUnread = !email.read;
@@ -493,7 +497,7 @@ function renderEmailRow(inboxName, email) {
   overflow:hidden;
   " onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--shadow)'"
   onmouseout="this.style.borderColor='${isUnread ? "var(--accent)" : "var(--surface1)"}';this.style.boxShadow='none'">
-  <a href="/${encodeURIComponent(inboxName)}/${encodeURIComponent(email.id)}"
+  <a href="/${encodeURIComponent(inboxName)}/${encodeURIComponent(email.id)}?domain=${encodeURIComponent(currentDomain)}"
   style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
   <div style="flex:1;min-width:0;">

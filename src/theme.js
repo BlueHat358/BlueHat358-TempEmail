@@ -525,7 +525,7 @@ function confirmDelete(msg, onConfirm) {
 // ─────────────────────────────────────────────
 // Base HTML shell
 // ─────────────────────────────────────────────
-export function baseLayout({ title, head = "", body, inboxName = null }) {
+export function baseLayout({ title, head = "", body, inboxName = null, brandDomain = "bluehat358.biz.id" }) {
   return `<!DOCTYPE html>
   <html lang="id">
   <head>
@@ -561,7 +561,7 @@ export function baseLayout({ title, head = "", body, inboxName = null }) {
   <div class="logo-icon">📬</div>
   <div>
   <div>BlueHat<span style="color:var(--accent)">358</span></div>
-  <div class="logo-sub">TempMail · @bluehat358.biz.id</div>
+  <div class="logo-sub">TempMail · @${escapeHtml(brandDomain || "bluehat358.biz.id")}</div>
   </div>
   </a>
   <div class="topbar-right">

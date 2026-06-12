@@ -1,7 +1,10 @@
 // src/pages/about.js — Halaman About/FAQ
+// Fase: multi-domain support
 import { baseLayout, escapeHtml } from "../theme.js";
 
-export function renderAboutPage() {
+export function renderAboutPage({ domains = [], domain = "" } = {}) {
+  const currentDomain = domain || domains[0] || "bluehat358.biz.id";
+
   const body = `
     <!-- Header -->
     <div style="margin-bottom: 2.5rem;">
@@ -36,7 +39,7 @@ export function renderAboutPage() {
         <h2>Cara Kerja</h2>
         <p>
           Setiap nama yang kamu masukkan otomatis menjadi inbox di domain
-          <code>@bluehat358.biz.id</code>. Tidak ada proses pendaftaran.
+          <code>@${escapeHtml(currentDomain)}</code>. Tidak ada proses pendaftaran.
           Email masuk langsung disimpan dan bisa dibuka siapapun yang tahu URL-nya.
         </p>
       </div>
@@ -242,7 +245,7 @@ export function renderAboutPage() {
     }
   </style>`;
 
-  const page = baseLayout({ title: "Tentang & FAQ", head, body });
+  const page = baseLayout({ title: "Tentang & FAQ", head, body, brandDomain: currentDomain });
 
   return page.replace("</body>", `
 <script>

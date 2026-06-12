@@ -27,7 +27,21 @@ class_name = "InboxBroadcaster"
 tag         = "v1"
 new_sqlite_classes = ["InboxBroadcaster"]
 
+# ─── Domain Configuration ─────────────────────────────────────────────────
+# Daftar domain yang didukung (dipisah spasi/koma).
+# Bisa diatur via:
+#   1) Environment variable DOMAIN_LIST di Cloudflare Dashboard
+#   2) Atau tambahkan [vars] section di bawah ini (uncomment):
+#
+[vars]
+DOMAIN_LIST = "bluehat358.biz.id,bluehat358.cc.cd,darkrail.kdns.fr"
+#
+# Domain pertama akan menjadi default. User bisa memilih domain
+# lain via dropdown select box di halaman utama.
+# ───────────────────────────────────────────────────────────────────────────
+
 # ─── Email Routing ────────────────────────────────────────────────────────
 # Konfigurasi via Cloudflare Dashboard:
 #   Email → Email Routing → Routes → Add route:
 #   Pattern: *@bluehat358.biz.id → Worker: bluehat358-tempmail
+#   (Buat route terpisah untuk setiap domain tambahan)

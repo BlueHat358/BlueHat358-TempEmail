@@ -29,6 +29,25 @@ import {
   getClientIp,
 } from "./rate-limit.js";
 
+const DEFAULT_DOMAINS = ["bluehat358.biz.id"];
+
+function parseDomainList(env) {
+  const raw = env.DOMAIN_LIST || env.DOMAIN_LISTING;
+  if (!raw || typeof raw !== "string") return [...DEFAULT_DOMAINS];
+  const parsed = raw
+    .split(/[\s,;]+/)
+    .map((d) => d.trim().replace(/^@/, ""))
+    .filter(Boolean);
+  return parsed.length ? parsed : [...DEFAULT_DOMAINS];
+}
+
+function getDomainForHost(hostname, domains) {
+  if (!hostname) return domains[0];
+  const lower = hostname.split(":")[0];
+  const matched = domains.find((d) => d.toLowerCase() === lower.toLowerCase());
+  return matched || domains[0];
+}
+
 // Re-export Durable Object class (wrangler butuh ini di entry point)
 export { InboxBroadcaster };
 
@@ -41,15 +60,30 @@ async function handleRequest(request, env, ctx) {
   const method   = request.method;
   const ip       = getClientIp(request);
 
+  const domains = parseDomainList(env);
+  const queryDomain = (url.searchParams.get("domain") || "").trim();
+  const normalizedQuery = queryDomain
+    ? domains.find((d) => d.toLowerCase() === queryDomain.toLowerCase())
+    : null;
+  const hostDomain = getDomainForHost(url.hostname, domains);
+  const resolvedDomain = normalizedQuery || hostDomain;
+
+  // Build dynamic allowed origins from available domains
+  const allowedOrigins = domains.map((d) => `https://${d}`);
+  allowedOrigins.push("http://localhost:8787", url.origin);
+
   // ── OPTIONS (CORS preflight) ─────────────────────────────────────
   if (method === "OPTIONS") {
+    const requestOrigin = request.headers.get("Origin") || "";
+    const corsOrigin = allowedOrigins.find((a) => requestOrigin.startsWith(a)) || "";
     return new Response(null, {
       status: 204,
       headers: {
-        "Access-Control-Allow-Origin":  "https://bluehat358.biz.id",
+        "Access-Control-Allow-Origin":  corsOrigin || (domains.length > 0 ? `https://${domains[0]}` : "https://bluehat358.biz.id"),
         "Access-Control-Allow-Methods": "GET, DELETE",
         "Access-Control-Allow-Headers": "Content-Type",
         "Access-Control-Max-Age":       "86400",
+        "Vary":                         "Origin",
       },
     });
   }
@@ -57,8 +91,7 @@ async function handleRequest(request, env, ctx) {
   // ── CORS check untuk DELETE ──────────────────────────────────────
   if (method === "DELETE") {
     const origin  = request.headers.get("Origin") || "";
-    const allowed = ["https://bluehat358.biz.id", "http://localhost:8787", url.origin];
-    if (origin && !allowed.some((a) => origin.startsWith(a))) {
+    if (origin && !allowedOrigins.some((a) => origin.startsWith(a))) {
       return jsonResponse({ error: "Forbidden" }, 403);
     }
   }
@@ -95,7 +128,12 @@ async function handleRequest(request, env, ctx) {
         429
       );
     }
-    return htmlResponse(renderHomePage());
+    return htmlResponse(renderHomePage({
+      domains,
+      defaultDomain: hostDomain,
+      forcedDomain: normalizedQuery,
+      domain: resolvedDomain,
+    }));
   }
 
   // ── GET /about ────────────────────────────────────────────────────
@@ -107,7 +145,7 @@ async function handleRequest(request, env, ctx) {
         429
       );
     }
-    return htmlResponse(renderAboutPage());
+    return htmlResponse(renderAboutPage({ domains, domain: resolvedDomain }));
   }
 
   // ── GET /events/{inboxName} — SSE via Durable Objects ────────────
@@ -179,7 +217,12 @@ async function handleRequest(request, env, ctx) {
         )
       : emails;
 
-    return htmlResponse(renderInboxPage(inboxName, filtered, stats, searchQuery));
+    return htmlResponse(
+      renderInboxPage(inboxName, filtered, stats, searchQuery, {
+        domains,
+        domain: resolvedDomain,
+      })
+    );
   }
 
   if (parts.length === 2 && method === "GET") {
@@ -211,7 +254,7 @@ async function handleRequest(request, env, ctx) {
 
     ctx.waitUntil(markEmailRead(env, inboxName, emailId));
 
-    return htmlResponse(renderEmailDetailPage(inboxName, email));
+    return htmlResponse(renderEmailDetailPage(inboxName, email, { domain: resolvedDomain }));
   }
 
   return htmlResponse(

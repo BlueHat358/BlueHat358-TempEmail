@@ -1,10 +1,12 @@
 // src/pages/email-detail.js — Email detail view: body + tabs + attachments
+// Fase: multi-domain support
 
 import { baseLayout, escapeHtml } from "../theme.js";
 import { formatDate, formatBytes, timeAgo, formatExpiry, isExpiringSoon } from "../utils.js";
 
-export function renderEmailDetailPage(inboxName, email) {
-  const emailAddr = `${inboxName}@bluehat358.biz.id`;
+export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
+  const currentDomain = domain || "bluehat358.biz.id";
+  const emailAddr = `${inboxName}@${currentDomain}`;
   const hasHtml = !!email.htmlBody;
   const hasText = !!email.body;
   const hasAtt = email.attachments && email.attachments.length > 0;
@@ -28,7 +30,7 @@ export function renderEmailDetailPage(inboxName, email) {
     ">
       <a href="/">Beranda</a>
       <span style="color:var(--overlay)">›</span>
-      <a href="/${encodeURIComponent(inboxName)}">${escapeHtml(emailAddr)}</a>
+      <a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}">${escapeHtml(emailAddr)}</a>
       <span style="color:var(--overlay)">›</span>
       <span style="color:var(--text)">Email</span>
     </div>
@@ -46,7 +48,7 @@ export function renderEmailDetailPage(inboxName, email) {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
           <h1 style="font-size:1.3rem;line-height:1.35;flex:1;">${escapeHtml(email.subject)}</h1>
           <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-            <a href="/${encodeURIComponent(inboxName)}" class="btn btn-sm btn-secondary">
+            <a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" class="btn btn-sm btn-secondary">
               ← Kembali
             </a>
             <button class="btn btn-sm btn-danger" onclick="deleteThisEmail()">🗑️ Hapus</button>
@@ -206,6 +208,7 @@ export function renderEmailDetailPage(inboxName, email) {
     inboxName,
     head,
     body,
+    brandDomain: currentDomain,
   });
 
   const htmlBodyEscaped = hasHtml
@@ -217,6 +220,7 @@ export function renderEmailDetailPage(inboxName, email) {
     `<script>
 var INBOX = '${escapeHtml(inboxName)}';
 var EMAIL_ID = '${escapeHtml(email.id)}';
+var DOMAIN = '${escapeHtml(currentDomain)}';
 
 // Inject HTML email into sandbox iframe
 var htmlBody = ${htmlBodyEscaped};
@@ -250,7 +254,7 @@ window.deleteThisEmail = function deleteThisEmail() {
         if (r.ok) {
           showToast('Email dihapus', 'success');
           setTimeout(function() {
-            window.location.href = '/' + INBOX;
+            window.location.href = '/' + INBOX + '?domain=' + encodeURIComponent(DOMAIN);
           }, 800);
         } else {
           showToast('Gagal menghapus', 'error');

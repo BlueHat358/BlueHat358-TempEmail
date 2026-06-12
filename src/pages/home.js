@@ -1,8 +1,15 @@
 // src/pages/home.js — Homepage: form input inbox + generate random
+// Fase: multi-domain support with select box
 
 import { baseLayout, escapeHtml } from "../theme.js";
 
-export function renderHomePage() {
+export function renderHomePage({ domains = [], defaultDomain = "", domain = "" } = {}) {
+  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.biz.id";
+
+  const domainOptions = domains.map((d) =>
+    `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>@${escapeHtml(d)}</option>`
+  ).join("");
+
   const body = `
     <!-- Hero section -->
     <div style="text-align:center; padding: 3rem 0 2rem;">
@@ -83,7 +90,7 @@ export function renderHomePage() {
         line-height:1.7;
         font-family:'Space Grotesk',sans-serif;
       ">
-        Inbox instan di <code style="color:var(--accent)">@bluehat358.biz.id</code>.
+        Inbox instan di <code style="color:var(--accent)" id="hero-domain-display">@${escapeHtml(currentDomain)}</code>.
         Tanpa daftar, tanpa password. Email otomatis hilang dalam 7 hari.
       </p>
 
@@ -98,6 +105,30 @@ export function renderHomePage() {
           letter-spacing:0.06em;
           margin-bottom:0.75rem;
         ">Nama Inbox</label>
+
+        <!-- Domain Selector -->
+        <div style="margin-bottom:0.75rem; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+          <label for="domain-select" style="
+            font-size:0.8rem;
+            color:var(--subtext);
+            font-weight:500;
+          ">Pilih domain:</label>
+          <select id="domain-select" onchange="updateDomainDisplay()" style="
+            background:var(--mantle);
+            border:1.5px solid var(--surface1);
+            border-radius:var(--radius-md);
+            color:var(--text);
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.9rem;
+            padding:0.5rem 0.75rem;
+            outline:none;
+            cursor:pointer;
+            flex:1;
+            min-width:200px;
+          ">
+            ${domainOptions}
+          </select>
+        </div>
 
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
           <div class="input-group" style="flex:1;min-width:220px;">
@@ -115,7 +146,7 @@ export function renderHomePage() {
               oninput="validateInput(this)"
               style="border-radius: var(--radius-md) 0 0 var(--radius-md);"
             >
-            <div class="input-addon">@bluehat358.biz.id</div>
+            <div class="input-addon" id="domain-suffix">@${escapeHtml(currentDomain)}</div>
           </div>
           <button id="open-inbox-btn" class="btn btn-primary" onclick="goToInbox()">
             Buka Inbox →
@@ -180,7 +211,7 @@ export function renderHomePage() {
       </h2>
       <div style="display:grid;gap:0.75rem;">
         ${stepCard("01", "Buat nama inbox", "Ketik nama inbox kamu atau klik Generate Acak. Nama hanya bisa menggunakan huruf kecil (a–z), angka (0–9), dan tanda hubung.")}
-        ${stepCard("02", "Bagikan alamat emailmu", "Gunakan alamat <code style='color:var(--accent)'>nama@bluehat358.biz.id</code> saat mendaftar di layanan yang ingin kamu coba.")}
+        ${stepCard("02", "Bagikan alamat emailmu", `Gunakan alamat <code style='color:var(--accent)'>nama@${escapeHtml(currentDomain)}</code> saat mendaftar di layanan yang ingin kamu coba.`)}
         ${stepCard("03", "Terima email", "Email akan muncul otomatis di inboxmu. Tidak perlu refresh — halaman akan update sendiri.")}
         ${stepCard("04", "Selesai", "Email dan attachment akan otomatis dihapus setelah 7–8 hari. Atau kamu bisa hapus manual kapan saja.")}
       </div>
@@ -210,18 +241,26 @@ export function renderHomePage() {
       align-items: flex-start;
       gap: 1rem;
     }
+    #domain-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(203,166,247,0.15);
+    }
   </style>`;
 
   const page = baseLayout({
     title: "Beranda",
     head,
     body,
+    brandDomain: currentDomain,
   });
 
-  // Inject JS
+  // Inject JS — including domain list for client-side
   return page.replace(
     "</body>",
     `<script>
+  var DOMAINS = ${JSON.stringify(domains)};
+  var CURRENT_DOMAIN = '${escapeHtml(currentDomain)}';
+
   // Cek status sistem saat halaman dimuat
   (async function checkSystemStatus() {
     try {
@@ -248,6 +287,17 @@ export function renderHomePage() {
     } catch(e) {}
   })();
 
+  // Update domain display when select changes
+  function updateDomainDisplay() {
+    var sel = document.getElementById('domain-select');
+    var domain = sel ? sel.value : CURRENT_DOMAIN;
+    var suffix = document.getElementById('domain-suffix');
+    if (suffix) suffix.textContent = '@' + domain;
+    var hero = document.getElementById('hero-domain-display');
+    if (hero) hero.textContent = '@' + domain;
+    CURRENT_DOMAIN = domain;
+  }
+
   // Validation
   function validateInput(el) {
     var val = el.value.toLowerCase().trim();
@@ -255,7 +305,7 @@ export function renderHomePage() {
     var err = document.getElementById('input-error');
     if (val.length > 0 && (val.length < 3 || !/^[a-z0-9][a-z0-9\\-]{1,30}[a-z0-9]$/.test(val) && val.length > 2)) {
       err.style.display = 'block';
-      err.textContent = 'Nama tidak valid. Gunakan 3–32 karakter: huruf kecil, angka, tanda hubung. Tidak boleh diawali/diakhiri "-".';
+      err.textContent = 'Nama tidak valid. Gunakan 3\u201332 karakter: huruf kecil, angka, tanda hubung. Tidak boleh diawali/diakhiri "-".';
     } else {
       err.style.display = 'none';
     }
@@ -273,7 +323,9 @@ export function renderHomePage() {
     if (!/^[a-z0-9][a-z0-9\\-]{1,30}[a-z0-9]$/.test(val) && val.length > 2) {
       showToast('Nama inbox tidak valid', 'error'); return;
     }
-    window.location.href = '/' + encodeURIComponent(val);
+    var domain = document.getElementById('domain-select')?.value || CURRENT_DOMAIN;
+    var params = domain ? '?domain=' + encodeURIComponent(domain) : '';
+    window.location.href = '/' + encodeURIComponent(val) + params;
   }
 
   function generateRandom() {
