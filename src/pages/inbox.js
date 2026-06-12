@@ -365,7 +365,7 @@ ${searchQuery
                       var isUnread = !email.read;
                       var hasAtt = email.attachmentCount > 0;
                       var border = isUnread ? 'var(--accent)' : 'var(--surface1)';
-                      var emailIdEscaped = email.id.replace(/&/g, '&').replace(/'/g, ''');
+                      var emailIdEscaped = email.id.replace(/&/g, '&amp;').replace(/'/g, '&#39;');
                       var inboxEnc = encodeURIComponent(INBOX);
                       var emailEnc = encodeURIComponent(email.id);
                       return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
@@ -380,7 +380,7 @@ ${searchQuery
                           '</div>' +
                         '</a>' +
                         '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail('' + emailIdEscaped + '')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(\'' + emailIdEscaped + \'')" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                         '</div>' +
                       '</div>';
                     }

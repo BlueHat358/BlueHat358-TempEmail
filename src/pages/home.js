@@ -7,7 +7,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.biz.id";
 
   const domainOptions = domains.map((d) =>
-    `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>@${escapeHtml(d)}</option>`
+    `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>${escapeHtml(d)}</option>`
   ).join("");
 
   const body = `
