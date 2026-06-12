@@ -123,7 +123,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
               style="border-radius: var(--radius-md) 0 0 var(--radius-md);"
             >
             <div class="input-addon" id="domain-suffix">
-              @
+              @ 
               <select id="domain-select" onchange="updateDomainDisplay()" style="
                 background:transparent;
                 border:none;

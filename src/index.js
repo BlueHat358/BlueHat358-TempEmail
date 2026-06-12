@@ -52,6 +52,16 @@ function getDomainForHost(hostname, domains) {
 // Re-export Durable Object class (wrangler butuh ini di entry point)
 export { InboxBroadcaster };
 
+/**
+ * Gabungkan local part + domain menjadi inboxName yang unik per-domain.
+ * resolveInboxName("darkrail", "bluehat358.biz.id") → "darkrail@bluehat358.biz.id"
+ */
+function resolveInboxName(localPart, domain) {
+  const local = sanitizeInboxName(localPart);
+  if (!domain) return local;
+  return `${local}@${domain.toLowerCase().trim()}`;
+}
+
 // ─────────────────────────────────────────────
 // HTTP Request Handler
 // ─────────────────────────────────────────────
@@ -110,7 +120,7 @@ async function handleRequest(request, env, ctx) {
           { ...rateLimitHeaders("api", rl), "Retry-After": String(rl.resetIn) }
         );
       }
-      const name = sanitizeInboxName(checkParam);
+      const name = resolveInboxName(checkParam, resolvedDomain);
       if (!isValidInboxName(name)) {
         return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
       }
@@ -151,7 +161,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── GET /events/{inboxName} — SSE via Durable Objects ────────────
   if (pathname.startsWith("/events/") && method === "GET") {
-    const inboxName = sanitizeInboxName(pathname.slice(8));
+    const inboxName = resolveInboxName(pathname.slice(8), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
     }
@@ -177,7 +187,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── /api/* ────────────────────────────────────────────────────────
   if (pathname.startsWith("/api/")) {
-    return handleApiRoute(pathname, method, url, env, ctx, ip);
+    return handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomain);
   }
 
   // ── Route: /{inboxName} dan /{inboxName}/{emailId} ───────────────
@@ -192,7 +202,7 @@ async function handleRequest(request, env, ctx) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(parts[0]));
+    const inboxName = resolveInboxName(decodeURIComponent(parts[0]), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return htmlResponse(
         errorPage(
@@ -235,7 +245,7 @@ async function handleRequest(request, env, ctx) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(parts[0]));
+    const inboxName = resolveInboxName(decodeURIComponent(parts[0]), resolvedDomain);
     const emailId   = decodeURIComponent(parts[1]);
 
     if (!isValidInboxName(inboxName)) {
@@ -367,7 +377,7 @@ function handleSsePingOnly(request) {
 // ─────────────────────────────────────────────
 // API Route Handler
 // ─────────────────────────────────────────────
-async function handleApiRoute(pathname, method, url, env, ctx, ip) {
+async function handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomain) {
   const segments = pathname.slice(5).split("/").filter(Boolean);
 
   // GET /api/inbox/{name} — list emails JSON (dengan search)
@@ -381,7 +391,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return jsonResponse({ error: "Nama inbox tidak valid", hint: "Gunakan a-z, 0-9, dan tanda hubung" }, 400);
     }
@@ -438,7 +448,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     const emailId   = decodeURIComponent(segments[2]);
 
     if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
@@ -464,7 +474,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
 
     const marked = await markAllEmailsRead(env, inboxName);
@@ -482,7 +492,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
 
     ctx.waitUntil(deleteAllEmails(env, inboxName));
@@ -526,7 +536,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
       );
     }
 
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
 
     const stats = await getStats(env, inboxName);
@@ -535,7 +545,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip) {
 
   // GET /api/connections/{inboxName} — jumlah SSE connections aktif (Fase 3)
   if (segments[0] === "connections" && segments.length === 2 && method === "GET") {
-    const inboxName = sanitizeInboxName(decodeURIComponent(segments[1]));
+    const inboxName = resolveInboxName(decodeURIComponent(segments[1]), resolvedDomain);
     if (!isValidInboxName(inboxName)) return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
 
     if (!env.INBOX_BROADCASTER) {
