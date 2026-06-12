@@ -35,9 +35,14 @@ export async function handleIncomingEmail(message, env, ctx) {
 
   try {
     // ── 1. Extract & validate inbox name ──────────────────────────────
-    const toAddress = message.to || "";
-    const localPart = toAddress.split("@")[0] || "";
-    inboxName = sanitizeInboxName(localPart);
+    const toAddress  = message.to || "";
+    const atIdx      = toAddress.indexOf("@");
+    const localPart  = atIdx > -1 ? toAddress.slice(0, atIdx) : toAddress;
+    const domainPart = atIdx > -1 ? toAddress.slice(atIdx + 1) : "";
+    const sanitizedLocal  = sanitizeInboxName(localPart);
+    const sanitizedDomain = domainPart.toLowerCase().trim();
+    // inboxName menyertakan domain agar darkrail@domain-a ≠ darkrail@domain-b
+    inboxName = sanitizedDomain ? `${sanitizedLocal}@${sanitizedDomain}` : sanitizedLocal;
 
     if (!isValidInboxName(inboxName)) {
       console.log(`[email] Rejected: invalid inbox name "${inboxName}"`);

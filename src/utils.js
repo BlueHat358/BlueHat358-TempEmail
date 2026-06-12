@@ -3,11 +3,19 @@
 // ─────────────────────────────────────────────
 // Inbox Name Validation
 // ─────────────────────────────────────────────
-const INBOX_REGEX = /^[a-z0-9][a-z0-9\-]{1,30}[a-z0-9]$/;
+const LOCAL_REGEX  = /^[a-z0-9][a-z0-9\-]{1,30}[a-z0-9]$/;
+const DOMAIN_REGEX = /^[a-z0-9][a-z0-9\-\.]{1,60}[a-z0-9]$/;
 
 export function isValidInboxName(name) {
   if (!name || typeof name !== "string") return false;
-  return INBOX_REGEX.test(name);
+  if (name.includes("@")) {
+    const atIdx = name.indexOf("@");
+    const local  = name.slice(0, atIdx);
+    const domain = name.slice(atIdx + 1);
+    return LOCAL_REGEX.test(local) && DOMAIN_REGEX.test(domain);
+  }
+  // fallback tanpa domain (backward-compat)
+  return LOCAL_REGEX.test(name);
 }
 
 export function sanitizeInboxName(raw) {
