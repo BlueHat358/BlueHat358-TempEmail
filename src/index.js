@@ -58,6 +58,8 @@ export { InboxBroadcaster };
  */
 function resolveInboxName(localPart, domain) {
   const local = sanitizeInboxName(localPart);
+  // Kalau sudah mengandung @domain (dari API call JS client), jangan tambah lagi
+  if (local.includes("@")) return local;
   if (!domain) return local;
   return `${local}@${domain.toLowerCase().trim()}`;
 }
@@ -161,7 +163,7 @@ async function handleRequest(request, env, ctx) {
 
   // ── GET /events/{inboxName} — SSE via Durable Objects ────────────
   if (pathname.startsWith("/events/") && method === "GET") {
-    const inboxName = resolveInboxName(pathname.slice(8), resolvedDomain);
+    const inboxName = resolveInboxName(decodeURIComponent(pathname.slice(8)), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return jsonResponse({ error: "Nama inbox tidak valid" }, 400);
     }
