@@ -34,7 +34,7 @@ new_sqlite_classes = ["InboxBroadcaster"]
 #   2) Atau tambahkan [vars] section di bawah ini (uncomment):
 #
 [vars]
-DOMAIN_LIST = "bluehat358.biz.id,bluehat358.cc.cd,darkrail.kdns.fr"
+DOMAIN_LIST = "bluehat358.biz.id,bluehat358.ccwu.cc,darkrail.kdns.fr"
 #
 # Domain pertama akan menjadi default. User bisa memilih domain
 # lain via dropdown select box di halaman utama.
