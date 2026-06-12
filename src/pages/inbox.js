@@ -26,7 +26,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
   </p>
   <p style="font-size:0.875rem;">
   ${searchQuery
-    ? `<a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" style="color:var(--accent)">Hapus filter pencarian</a>`
+    ? `<a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" style="color:var(--accent)">Hapus filter pencarian</a>`
     : `Kirim email ke <code style="color:var(--accent)">${escapeHtml(emailAddr)}</code> untuk mulai.`}
     </p>
     </div>`
@@ -149,7 +149,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
           "
           >
           ${searchQuery
-            ? `<a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" style="
+            ? `<a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" style="
             color:var(--overlay);
             font-size:0.8rem;
             text-decoration:none;
@@ -206,6 +206,7 @@ ${searchQuery
                     "</body>",
                     `<script>
                     var INBOX = '${escapeHtml(inboxName)}';
+                    var INBOX_LOCAL = '${escapeHtml(localPart)}';
                     var DOMAIN = '${escapeHtml(currentDomain)}';
                     var CURRENT_TOTAL = ${totalEmails};
                     var pollInterval = null;
@@ -243,7 +244,7 @@ ${searchQuery
                       clearTimeout(searchTimer);
                       searchTimer = setTimeout(function() {
                         var q = val.trim();
-                        var target = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
+                        var target = '/' + encodeURIComponent(INBOX_LOCAL) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
                         window.location.href = target;
                       }, 600);
                     };
@@ -430,7 +431,7 @@ ${searchQuery
                       var hasAtt = email.attachmentCount > 0;
                       var border = isUnread ? 'var(--accent)' : 'var(--surface1)';
                       var emailIdEscaped = encodeURIComponent(email.id);
-                      var inboxEnc = encodeURIComponent(INBOX);
+                      var inboxEnc = encodeURIComponent(INBOX_LOCAL);
                       var emailEnc = encodeURIComponent(email.id);
                       return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
                         '<a href="/' + inboxEnc + '/' + emailEnc + '?domain=' + encodeURIComponent(DOMAIN) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
@@ -537,11 +538,11 @@ ${searchQuery
                           if (e.key === 'Enter') {
                             clearTimeout(searchTimer);
                             var q = si.value.trim();
-                            window.location.href = '/' + encodeURIComponent(INBOX) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
+                            window.location.href = '/' + encodeURIComponent(INBOX_LOCAL) + (q ? '?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(DOMAIN) : '?domain=' + encodeURIComponent(DOMAIN));
                           }
                           if (e.key === 'Escape') {
                             si.value = '';
-                            window.location.href = '/' + encodeURIComponent(INBOX) + '?domain=' + encodeURIComponent(DOMAIN);
+                            window.location.href = '/' + encodeURIComponent(INBOX_LOCAL) + '?domain=' + encodeURIComponent(DOMAIN);
                           }
                         });
                       }
@@ -552,6 +553,7 @@ ${searchQuery
 }
 
 function renderEmailRow(inboxName, email, currentDomain) {
+  const localPart = inboxName.includes("@") ? inboxName.split("@")[0] : inboxName;
   const ago = timeAgo(email.receivedAt);
   const hasAtt = email.attachments && email.attachments.length > 0;
   const isUnread = !email.read;
@@ -569,7 +571,7 @@ function renderEmailRow(inboxName, email, currentDomain) {
   overflow:hidden;
   " onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--shadow)'"
   onmouseout="this.style.borderColor='${isUnread ? "var(--accent)" : "var(--surface1)"}';this.style.boxShadow='none'">
-  <a href="/${encodeURIComponent(inboxName)}/${encodeURIComponent(email.id)}?domain=${encodeURIComponent(currentDomain)}"
+  <a href="/${encodeURIComponent(localPart)}/${encodeURIComponent(email.id)}?domain=${encodeURIComponent(currentDomain)}"
   style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">
   <div style="flex:1;min-width:0;">
