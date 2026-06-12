@@ -439,7 +439,7 @@ ${searchQuery
                           '</div>' +
                         '</a>' +
                         '<div style="border-top:1px solid var(--surface1);padding:0.4rem 1.25rem;display:flex;justify-content:flex-end;">' +
-                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent(\'' + emailIdEscaped + '\'))" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
+                          '<button class="btn btn-sm btn-ghost" onclick="event.stopPropagation();deleteSingleEmail(decodeURIComponent(' + emailIdEscaped + '))" style="color:var(--red);font-size:0.75rem;">🗑️ Hapus</button>' +
                         '</div>' +
                       '</div>';
                     }
