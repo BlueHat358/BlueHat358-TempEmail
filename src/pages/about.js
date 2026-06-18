@@ -9,7 +9,7 @@ import {
 } from "../config.js";
 
 export function renderAboutPage({ domains = [], domain = "" } = {}) {
-  const currentDomain = domain || domains[0] || "bluehat358.eu.cc";
+  const currentDomain = domain || domains[0] || "bluehat358.biz.id";
 
   // Nilai dari config — tampil di FAQ & tabel
   const emailTtl     = EMAIL_TTL_DAYS;
@@ -95,7 +95,7 @@ export function renderAboutPage({ domains = [], domain = "" } = {}) {
         ${faqItem("Apakah bisa menerima email HTML?",
           "Ya. Email HTML di-render dalam iframe yang di-sandbox untuk mencegah XSS. Script dalam email diblokir sepenuhnya.")}
         ${faqItem("Apa itu nama inbox yang valid?",
-          "Nama inbox hanya boleh menggunakan huruf kecil (a–z), angka (0–9), dan tanda hubung (-). Minimal 3 karakter, maksimal 32 karakter. Tidak boleh diawali atau diakhiri tanda hubung.")}
+          "Nama inbox boleh menggunakan huruf kecil (a–z), angka (0–9), titik (.), underscore (_), plus (+), dan tanda hubung (-). Minimal 3 karakter, maksimal 64 karakter. Tidak boleh diawali atau diakhiri simbol, dan tidak boleh ada simbol berurutan (mis: \"..\", \"--\").")}
         ${faqItem("Kenapa email saya tidak muncul?",
           `Periksa: (1) Apakah alamat email sudah benar? (2) Email mungkin tertahan di server pengirim. (3) Inbox mungkin sudah penuh (${maxEmails} email). (4) Coba klik Refresh. Ingat, tidak semua layanan bisa kirim ke domain baru.`)}
         ${faqItem("Apakah bisa mengirim email dari sini?",
@@ -120,7 +120,7 @@ export function renderAboutPage({ domains = [], domain = "" } = {}) {
             <tr><td>Umur attachment</td><td><span class="limit-badge">${attTtl} hari</span></td><td>R2 cleanup tiap jam + lifecycle rule</td></tr>
             <tr><td>Maks email/inbox</td><td><span class="limit-badge">${maxEmails} email</span></td><td>Email terlama terhapus otomatis (FIFO)</td></tr>
             <tr><td>Maks ukuran attachment</td><td><span class="limit-badge">${maxAttMB} MB</span></td><td>File lebih besar di-skip</td></tr>
-            <tr><td>Panjang nama inbox</td><td><span class="limit-badge">3–32 karakter</span></td><td>Huruf kecil, angka, tanda hubung</td></tr>
+            <tr><td>Panjang nama inbox</td><td><span class="limit-badge">3–64 karakter</span></td><td>Huruf kecil, angka, . _ + -</td></tr>
             <tr><td>Rate limit halaman</td><td><span class="limit-badge">${rlPage.max} req/${rlPage.windowSec}d</span></td><td>Per IP</td></tr>
             <tr><td>Rate limit API</td><td><span class="limit-badge">${rlApi.max} req/${rlApi.windowSec}d</span></td><td>Per IP</td></tr>
             <tr><td>Rate limit hapus</td><td><span class="limit-badge">${rlDelete.max} req/${rlDelete.windowSec}d</span></td><td>Per IP</td></tr>

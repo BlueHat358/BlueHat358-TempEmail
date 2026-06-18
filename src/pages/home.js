@@ -10,7 +10,7 @@ import {
 } from "../config.js";
 
 export function renderHomePage({ domains = [], defaultDomain = "", domain = "" } = {}) {
-  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.eu.cc";
+  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.biz.id";
 
   const domainOptions = domains.map((d) =>
   `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>${escapeHtml(d)}</option>`
@@ -120,7 +120,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   class="input"
   placeholder="nama-inbox"
   maxlength="32"
-  pattern="[a-z0-9\\-]{3,32}"
+  pattern="[a-z0-9._+\\-]{3,64}"
   autocomplete="off"
   autocapitalize="none"
   spellcheck="false"
@@ -205,7 +205,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   Cara Pakai
   </h2>
   <div style="display:grid;gap:0.75rem;">
-  ${stepCard("01", "Buat nama inbox", "Ketik nama inbox kamu atau klik Generate Acak. Nama hanya bisa menggunakan huruf kecil (a–z), angka (0–9), dan tanda hubung.")}
+  ${stepCard("01", "Buat nama inbox", "Ketik nama inbox atau klik Generate Acak. Boleh pakai huruf kecil (a–z), angka (0–9), titik (.), underscore (_), plus (+), dan tanda hubung (-). Makin panjang & unik, makin aman.")}
   ${stepCard("02", "Bagikan alamat emailmu", `Gunakan alamat <code style='color:var(--accent)'>nama@${escapeHtml(currentDomain)}</code> saat mendaftar di layanan yang ingin kamu coba.`)}
   ${stepCard("03", "Terima email", "Email akan muncul otomatis di inboxmu. Tidak perlu refresh — halaman akan update tiap ${POLL_INTERVAL_SEC} detik.")}
   ${stepCard("04", "Selesai", "Email dan attachment akan otomatis dihapus setelah ${EMAIL_TTL_DAYS}–${ATTACHMENT_TTL_DAYS} hari. Atau kamu bisa hapus manual kapan saja.")}
@@ -337,12 +337,17 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
 
     // Validation
     function validateInput(el) {
-      var val = el.value.toLowerCase().trim();
-      el.value = val.replace(/[^a-z0-9\\-]/g,'');
+      var val = el.value.toLowerCase();
+      // strip karakter tidak valid
+      val = val.replace(/[^a-z0-9._+\-]/g,'');
+      // hapus simbol berurutan
+      val = val.replace(/[._+\-]{2,}/g,'-');
+      el.value = val;
       var err = document.getElementById('input-error');
-      if (val.length > 0 && (val.length < 3 || !/^[a-z0-9][a-z0-9\\-]{1,30}[a-z0-9]$/.test(val) && val.length > 2)) {
+      var startsOrEndsWithSymbol = /^[._+\-]|[._+\-]$/.test(val);
+      if (val.length > 0 && (val.length < 3 || val.length > 64 || startsOrEndsWithSymbol)) {
         err.style.display = 'block';
-        err.textContent = 'Nama tidak valid. Gunakan 3\u201332 karakter: huruf kecil, angka, tanda hubung. Tidak boleh diawali/diakhiri "-".';
+        err.textContent = 'Nama tidak valid. 3\u201364 karakter: huruf kecil, angka, titik, underscore, plus, atau tanda hubung. Tidak boleh diawali/diakhiri simbol.';
       } else {
         err.style.display = 'none';
       }
@@ -357,9 +362,9 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
       var val = document.getElementById('inbox-input').value.toLowerCase().trim();
       if (!val) { showToast('Masukkan nama inbox terlebih dahulu', 'error'); return; }
       if (val.length < 3) { showToast('Nama inbox minimal 3 karakter', 'error'); return; }
-      if (!/^[a-z0-9][a-z0-9\\-]{1,30}[a-z0-9]$/.test(val) && val.length > 2) {
-        showToast('Nama inbox tidak valid', 'error'); return;
-      }
+      if (val.length > 64) { showToast('Nama inbox maksimal 64 karakter', 'error'); return; }
+      if (/^[._+\-]|[._+\-]$/.test(val)) { showToast('Nama tidak boleh diawali atau diakhiri simbol', 'error'); return; }
+      if (/[._+\-]{2,}/.test(val)) { showToast('Simbol tidak boleh berurutan', 'error'); return; }
       var domain = document.getElementById('domain-select')?.value || CURRENT_DOMAIN;
       var params = domain ? '?domain=' + encodeURIComponent(domain) : '';
       window.location.href = '/' + encodeURIComponent(val) + params;
@@ -368,10 +373,12 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
     function generateRandom() {
       var adjs = ['swift','bold','calm','dark','echo','free','good','warm','cool','blue','fast','keen','lazy','mild','neat','open','pure','quiet','rich','safe','tiny','vast','wild','zen'];
       var nouns = ['panda','eagle','storm','maple','river','cloud','flame','stone','tiger','ocean','pixel','quark','lunar','ember','frost','grove','haven','ivory','jewel','karma','light'];
-      var adj = adjs[Math.floor(Math.random()*adjs.length)];
+      // Generate dengan mix karakter baru supaya lebih susah ditebak
+      var adj  = adjs[Math.floor(Math.random()*adjs.length)];
       var noun = nouns[Math.floor(Math.random()*nouns.length)];
-      var num = Math.floor(Math.random()*90+10);
-      var name = adj+'-'+noun+'-'+num;
+      var num  = Math.floor(Math.random()*9000+1000); // 4 digit
+      var sep  = ['.','_','-'][Math.floor(Math.random()*3)];
+      var name = adj + sep + noun + sep + num;
       document.getElementById('inbox-input').value = name;
       document.getElementById('input-error').style.display = 'none';
       document.getElementById('inbox-input').focus();

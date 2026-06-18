@@ -126,7 +126,7 @@ async function handleRequest(request, env, ctx) {
     const inboxName = resolveInboxName(decodeURIComponent(parts[0]), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return htmlResponse(
-        errorPage("Nama inbox tidak valid", "Gunakan 3–32 karakter: huruf kecil (a–z), angka (0–9), dan tanda hubung."),
+        errorPage("Nama inbox tidak valid", "Gunakan 3–64 karakter: huruf kecil (a–z), angka (0–9), titik (.), underscore (_), plus (+), atau tanda hubung (-). Tidak boleh diawali/diakhiri simbol."),
         400
       );
     }

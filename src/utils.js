@@ -3,8 +3,17 @@
 // ─────────────────────────────────────────────
 // Inbox Name Validation
 // ─────────────────────────────────────────────
-const LOCAL_REGEX  = /^[a-z0-9][a-z0-9\-]{1,30}[a-z0-9]$/;
+// Karakter yang diizinkan di local part:
+//   - huruf kecil (a-z), angka (0-9)
+//   - tanda hubung (-), titik (.), underscore (_), plus (+)
+// Aturan:
+//   - Minimal 3, maksimal 64 karakter
+//   - Harus diawali dan diakhiri huruf/angka (bukan simbol)
+//   - Tidak boleh ada simbol berurutan (mis: "..", "--", "._", "+.")
+const LOCAL_REGEX  = /^[a-z0-9]([a-z0-9._+\-]*[a-z0-9])?$/;
 const DOMAIN_REGEX = /^[a-z0-9][a-z0-9\-\.]{1,60}[a-z0-9]$/;
+// Simbol berurutan dilarang (mis: "..", "__", "+-", "-.")
+const CONSECUTIVE_SYMBOLS = /[._+\-]{2,}/;
 
 export function isValidInboxName(name) {
   if (!name || typeof name !== "string") return false;
@@ -12,14 +21,27 @@ export function isValidInboxName(name) {
     const atIdx = name.indexOf("@");
     const local  = name.slice(0, atIdx);
     const domain = name.slice(atIdx + 1);
-    return LOCAL_REGEX.test(local) && DOMAIN_REGEX.test(domain);
+    return isValidLocal(local) && DOMAIN_REGEX.test(domain);
   }
-  // fallback tanpa domain (backward-compat)
-  return LOCAL_REGEX.test(name);
+  return isValidLocal(name);
+}
+
+function isValidLocal(local) {
+  if (local.length < 3 || local.length > 64) return false;
+  if (CONSECUTIVE_SYMBOLS.test(local)) return false;
+  return LOCAL_REGEX.test(local);
 }
 
 export function sanitizeInboxName(raw) {
-  return raw.toLowerCase().trim();
+  return raw
+    .toLowerCase()
+    .trim()
+    // hapus karakter selain yang diizinkan
+    .replace(/[^a-z0-9._+\-]/g, "")
+    // hapus simbol berurutan
+    .replace(/[._+\-]{2,}/g, "-")
+    // hapus simbol di awal/akhir
+    .replace(/^[._+\-]+|[._+\-]+$/g, "");
 }
 
 // ─────────────────────────────────────────────
