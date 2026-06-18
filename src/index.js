@@ -42,8 +42,20 @@ function getDomainForHost(hostname, domains) {
 }
 
 function resolveInboxName(localPart, domain) {
+  // Jika input sudah berupa alamat lengkap (local@domain) — misalnya dikirim
+  // balik oleh client-side script yang menyimpan nama inbox penuh — pisahkan
+  // dulu local part dan domain SEBELUM disanitasi. Jangan sanitasi seluruh
+  // string langsung, karena sanitizeInboxName() membuang karakter '@',
+  // sehingga deteksi "sudah ada domain" jadi gagal dan domain malah
+  // ditempel dua kali (mis. "darkbluehat.eu.cc@bluehat.eu.cc").
+  if (localPart.includes("@")) {
+    const atIdx = localPart.indexOf("@");
+    const local = sanitizeInboxName(localPart.slice(0, atIdx));
+    const dom   = localPart.slice(atIdx + 1).toLowerCase().trim();
+    return dom ? `${local}@${dom}` : local;
+  }
+
   const local = sanitizeInboxName(localPart);
-  if (local.includes("@")) return local;
   if (!domain) return local;
   return `${local}@${domain.toLowerCase().trim()}`;
 }
