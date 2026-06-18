@@ -20,7 +20,7 @@ export const INBOX_QUOTA_DISPLAY  = 50;        // Angka "Maks X email" yang tamp
 export const INBOX_WARN_THRESHOLD = 45;        // Tampilkan warning "hampir penuh" di atas N email
 
 // ─── Domain default ───────────────────────────────────────────────────────
-export const DEFAULT_DOMAIN       = "bluehat358.eu.cc";
+export const DEFAULT_DOMAIN       = "bluehat358.pp.ua";
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────
 // Format: { max: jumlah_request, windowSec: rentang_waktu_detik }

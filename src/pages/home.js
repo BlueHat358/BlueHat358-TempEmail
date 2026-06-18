@@ -9,8 +9,8 @@ import {
   POLL_INTERVAL_SEC,
 } from "../config.js";
 
-export function renderHomePage({ domains = [], defaultDomain = "", domain = "" } = {}) {
-  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.biz.id";
+export function renderHomePage({ domains = [], defaultDomain = "", domain = "", nonce = "" } = {}) {
+  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.pp.ua";
 
   const domainOptions = domains.map((d) =>
   `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>${escapeHtml(d)}</option>`
@@ -64,7 +64,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   <span style="font-size:1.4rem;">⚠️</span>
   <div>
   <strong>Slot Hampir Habis</strong><br>
-  <span style="color:var(--subtext);">Hanya tersisa <strong id="available-slots">?</strong> slot alamat email. Gunakan nama yang sudah pernah dipakai jika memungkinkan.</span>
+  <span style="color:var(--subtext);">Slot alamat email yang tersisa hampir habis. Gunakan nama yang sudah pernah dipakai jika memungkinkan.</span>
   </div>
   </div>
   <div style="
@@ -124,11 +124,9 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   autocomplete="off"
   autocapitalize="none"
   spellcheck="false"
-  onkeydown="if(event.key==='Enter')goToInbox()"
-  oninput="validateInput(this)"
   >
   <div class="input-addon" id="domain-suffix">
-  @<select id="domain-select" onchange="updateDomainDisplay()" style="
+  @<select id="domain-select" style="
   background:transparent;
   border:none;
   color:var(--text);
@@ -143,7 +141,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   </select>
   </div>
   </div>
-  <button id="open-inbox-btn" class="btn btn-primary inbox-submit-btn" onclick="goToInbox()">
+  <button id="open-inbox-btn" class="btn btn-primary inbox-submit-btn">
   Buka Inbox →
   </button>
   </div>
@@ -168,7 +166,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   <hr style="flex:1;border:none;border-top:1px solid var(--surface1);">
   </div>
 
-  <button class="btn btn-secondary" onclick="generateRandom()" style="width:100%;">
+  <button class="btn btn-secondary" id="generate-random-btn" style="width:100%;">
   🎲 Generate Nama Acak
   </button>
   </div>
@@ -296,11 +294,13 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   // Inject JS — including domain list for client-side
   return page.replace(
     "</body>",
-    `<script>
+    `<script nonce="${nonce}">
     var DOMAINS = ${JSON.stringify(domains)};
     var CURRENT_DOMAIN = '${escapeHtml(currentDomain)}';
 
     // Cek status sistem saat halaman dimuat
+    // [Fix H-1] endpoint sekarang hanya mengembalikan boolean is_full /
+    // is_almost_full, tanpa angka slot persis.
     (async function checkSystemStatus() {
       try {
         const res = await fetch('/api/system/status');
@@ -315,13 +315,9 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
             btn.style.cursor = 'not-allowed';
             btn.title = 'Sistem penuh, tidak bisa membuat alamat baru';
           }
-        } else if (data.available_slots <= 2) {
+        } else if (data.is_almost_full) {
           var warn = document.getElementById('system-warn-banner');
-          if (warn) {
-            warn.style.display = 'flex';
-            var slot = document.getElementById('available-slots');
-            if (slot) slot.textContent = data.available_slots;
-          }
+          if (warn) warn.style.display = 'flex';
         }
       } catch(e) {}
     })();
@@ -373,16 +369,34 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
     function generateRandom() {
       var adjs = ['swift','bold','calm','dark','echo','free','good','warm','cool','blue','fast','keen','lazy','mild','neat','open','pure','quiet','rich','safe','tiny','vast','wild','zen'];
       var nouns = ['panda','eagle','storm','maple','river','cloud','flame','stone','tiger','ocean','pixel','quark','lunar','ember','frost','grove','haven','ivory','jewel','karma','light'];
-      // Generate dengan mix karakter baru supaya lebih susah ditebak
       var adj  = adjs[Math.floor(Math.random()*adjs.length)];
       var noun = nouns[Math.floor(Math.random()*nouns.length)];
-      var num  = Math.floor(Math.random()*9000+1000); // 4 digit
-      var sep  = ['.','_','-'][Math.floor(Math.random()*3)];
-      var name = adj + sep + noun + sep + num;
+      // [Fix H-2] suffix acak kriptografis 8 hex char (bukan angka 4 digit
+      // dari Math.random) — entropi jauh lebih tinggi & tidak predictable.
+      var bytes = new Uint8Array(4);
+      crypto.getRandomValues(bytes);
+      var suffix = Array.from(bytes).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+      var name = adj + '-' + noun + '-' + suffix;
       document.getElementById('inbox-input').value = name;
       document.getElementById('input-error').style.display = 'none';
       document.getElementById('inbox-input').focus();
     }
+
+    // [Fix M-1] CSP nonce-based tidak mengizinkan atribut onclick/oninput
+    // inline, jadi semua event handler dipasang lewat addEventListener.
+    document.addEventListener('DOMContentLoaded', function() {
+      var input = document.getElementById('inbox-input');
+      if (input) {
+        input.addEventListener('input', function() { validateInput(input); });
+        input.addEventListener('keydown', function(e) { if (e.key === 'Enter') goToInbox(); });
+      }
+      var domainSelect = document.getElementById('domain-select');
+      if (domainSelect) domainSelect.addEventListener('change', updateDomainDisplay);
+      var openBtn = document.getElementById('open-inbox-btn');
+      if (openBtn) openBtn.addEventListener('click', goToInbox);
+      var genBtn = document.getElementById('generate-random-btn');
+      if (genBtn) genBtn.addEventListener('click', generateRandom);
+    });
     </script>
     </body>`
   );

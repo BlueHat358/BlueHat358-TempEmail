@@ -25,7 +25,7 @@ crons = ["0 * * * *"]
 #   2) Atau tambahkan [vars] section di bawah ini (uncomment):
 #
 [vars]
-DOMAIN_LIST = "bluehat358.eu.cc,bluehat358.ccwu.cc,bluehat358.pp.ua"
+DOMAIN_LIST = "bluehat358.pp.ua,bluehat358.ccwu.cc"
 #
 # Domain pertama akan menjadi default. User bisa memilih domain
 # lain via dropdown select box di halaman utama.
@@ -34,5 +34,5 @@ DOMAIN_LIST = "bluehat358.eu.cc,bluehat358.ccwu.cc,bluehat358.pp.ua"
 # ─── Email Routing ────────────────────────────────────────────────────────
 # Konfigurasi via Cloudflare Dashboard:
 #   Email → Email Routing → Routes → Add route:
-#   Pattern: *@bluehat358.eu.cc → Worker: bluehat358-tempmail
+#   Pattern: *@bluehat358.pp.ua → Worker: bluehat358-tempmail
 #   (Buat route terpisah untuk setiap domain tambahan)

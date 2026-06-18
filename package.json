@@ -1,5 +1,5 @@
 {
-  "name": "bluehat358-tempmail",
+  "name": "temp-mail",
   "version": "3.0.0",
   "description": "BlueHat358 Temporary Email Service — Cloudflare Workers",
   "main": "src/index.js",

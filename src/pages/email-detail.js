@@ -2,12 +2,11 @@
 // Fase: multi-domain support
 
 import { baseLayout, escapeHtml } from "../theme.js";
-import { formatDate, formatBytes, timeAgo, formatExpiry, isExpiringSoon } from "../utils.js";
+import { formatDate, formatBytes, timeAgo, formatExpiry, isExpiringSoon, isPreviewableType } from "../utils.js";
 import { EMAIL_TTL_DAYS, MAX_ATTACHMENT_SIZE_MB } from "../config.js";
 
-export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
-  const currentDomain = domain || "bluehat358.biz.id";
-  // inboxName bisa berupa "dark@bluehat358.eu.cc" atau hanya "dark"
+export function renderEmailDetailPage(inboxName, email, { domain = "", nonce = "" } = {}) {
+  const currentDomain = domain || "bluehat358.pp.ua";
   const localPart = inboxName.includes("@") ? inboxName.split("@")[0] : inboxName;
   const emailAddr = `${localPart}@${currentDomain}`;
   const hasHtml = !!email.htmlBody;
@@ -54,7 +53,7 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
             <a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" class="btn btn-sm btn-secondary">
               ← Kembali
             </a>
-            <button class="btn btn-sm btn-danger" onclick="deleteThisEmail()">🗑️ Hapus</button>
+            <button class="btn btn-sm btn-danger" id="delete-email-btn">🗑️ Hapus</button>
           </div>
         </div>
 
@@ -78,7 +77,8 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
         <div style="margin-top:1rem;">
           <button
             class="btn btn-sm btn-secondary"
-            onclick="copyToClipboard('${escapeHtml(emailAddr)}', 'Alamat email')"
+            id="copy-email-addr-btn"
+            data-copy="${escapeHtml(emailAddr)}"
           >📋 Salin Alamat Email</button>
         </div>
       </div>
@@ -105,7 +105,7 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
           </div>
           <iframe
             id="html-frame"
-            sandbox="allow-same-origin"
+            sandbox="allow-popups allow-popups-to-escape-sandbox"
             style="
               width:100%;
               min-height:400px;
@@ -213,15 +213,22 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
     body,
     brandDomain: currentDomain,
     emailTtlDays: EMAIL_TTL_DAYS,
+    nonce,
   });
 
+  // [Fix C-1] JSON.stringify() TIDAK meng-escape sequence "</script>" di
+  // dalam string. Jika email.htmlBody (dikontrol penyerang via email
+  // masuk) berisi "</script><script>...", browser akan menutup tag
+  // <script> ini lebih awal lalu menjalankan skrip penyerang di luar
+  // konteks string — XSS yang sepenuhnya bisa dieksploitasi. Escape
+  // manual "</script" (case-insensitive) mencegah ini.
   const htmlBodyEscaped = hasHtml
-    ? JSON.stringify(email.htmlBody)
+    ? JSON.stringify(email.htmlBody).replace(/<\/script/gi, "<\\/script")
     : '""';
 
   return page.replace(
     "</body>",
-    `<script>
+    `<script nonce="${nonce}">
 var INBOX = '${escapeHtml(inboxName)}';   // full name untuk API
 var INBOX_LOCAL = '${escapeHtml(localPart)}'; // local part untuk URL
 var EMAIL_ID = '${escapeHtml(email.id)}';
@@ -244,15 +251,15 @@ if (htmlBody) {
 }
 
 // Tab switching
-window.switchTab = function switchTab(id) {
+function switchTab(id) {
   document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.querySelectorAll('.tab-panel').forEach(function(p) { p.style.display = 'none'; });
   document.getElementById('btn-' + id).classList.add('active');
   document.getElementById('panel-' + id).style.display = 'block';
-};
+}
 
 // Delete helper
-window.deleteThisEmail = function deleteThisEmail() {
+function deleteThisEmail() {
   confirmDelete('Hapus email ini?', function() {
     fetch('/api/inbox/' + INBOX + '/' + EMAIL_ID, { method: 'DELETE' })
       .then(function(r) {
@@ -267,7 +274,25 @@ window.deleteThisEmail = function deleteThisEmail() {
       })
       .catch(function() { showToast('Gagal menghapus', 'error'); });
   });
-};
+}
+
+// [Fix M-1] CSP nonce-based tidak mengizinkan onclick inline — semua
+// tombol & tab dipasang lewat addEventListener / event delegation.
+document.addEventListener('DOMContentLoaded', function() {
+  var delBtn = document.getElementById('delete-email-btn');
+  if (delBtn) delBtn.addEventListener('click', deleteThisEmail);
+
+  var copyBtn = document.getElementById('copy-email-addr-btn');
+  if (copyBtn) copyBtn.addEventListener('click', function() {
+    copyToClipboard(copyBtn.dataset.copy, 'Alamat email');
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      switchTab(btn.id.replace(/^btn-/, ''));
+    });
+  });
+});
 </script>
 </body>`
   );
@@ -284,7 +309,6 @@ function tabBtn(id, label, active) {
   return `<button
     id="btn-${escapeHtml(id)}"
     class="tab-btn ${active ? "active" : ""}"
-    onclick="switchTab('${escapeHtml(id)}')"
   >${label}</button>`;
 }
 
@@ -307,6 +331,8 @@ function renderAttachmentRow(att) {
     </div>`;
   }
 
+  const previewable = isPreviewableType(att.contentType);
+
   return `<div class="att-row">
     <div style="display:flex;align-items:center;gap:0.75rem;">
       <span style="font-size:1.5rem;">${icon}</span>
@@ -315,11 +341,23 @@ function renderAttachmentRow(att) {
         <div style="font-size:0.75rem;color:var(--subtext);">${sizeStr} · ${escapeHtml(att.contentType)}</div>
       </div>
     </div>
-    <a
-      href="/api/attachments/${encodeURIComponent(att.id)}"
-      class="btn btn-sm btn-primary"
-      download="${escapeHtml(att.filename)}"
-    >⬇️ Download</a>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+      ${
+        previewable
+          ? `<a
+            href="/api/attachments/${encodeURIComponent(att.id)}?view=1"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="btn btn-sm btn-secondary"
+          >👁️ Lihat</a>`
+          : ""
+      }
+      <a
+        href="/api/attachments/${encodeURIComponent(att.id)}"
+        class="btn btn-sm btn-primary"
+        download="${escapeHtml(att.filename)}"
+      >⬇️ Download</a>
+    </div>
   </div>`;
 }
 

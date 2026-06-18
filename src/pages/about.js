@@ -8,8 +8,8 @@ import {
   RATE_LIMITS,
 } from "../config.js";
 
-export function renderAboutPage({ domains = [], domain = "" } = {}) {
-  const currentDomain = domain || domains[0] || "bluehat358.biz.id";
+export function renderAboutPage({ domains = [], domain = "", nonce = "" } = {}) {
+  const currentDomain = domain || domains[0] || "bluehat358.pp.ua";
 
   // Nilai dari config — tampil di FAQ & tabel
   const emailTtl     = EMAIL_TTL_DAYS;
@@ -168,23 +168,30 @@ export function renderAboutPage({ domains = [], domain = "" } = {}) {
     .limit-badge { background:var(--surface1);color:var(--accent);padding:0.2rem 0.6rem;border-radius:var(--radius-sm);font-family:'JetBrains Mono',monospace;font-size:0.8rem;white-space:nowrap; }
   </style>`;
 
-  const page = baseLayout({ title: "Tentang & FAQ", head, body, brandDomain: currentDomain, emailTtlDays: EMAIL_TTL_DAYS });
+  const page = baseLayout({ title: "Tentang & FAQ", head, body, brandDomain: currentDomain, emailTtlDays: EMAIL_TTL_DAYS, nonce });
 
   return page.replace("</body>", `
-<script>
+<script nonce="${nonce}">
 function toggleFaq(el) {
   var item = el.closest('.faq-item');
   var wasOpen = item.classList.contains('open');
   document.querySelectorAll('.faq-item.open').forEach(function(i) { i.classList.remove('open'); });
   if (!wasOpen) item.classList.add('open');
 }
+
+// [Fix M-1] CSP nonce-based tidak mengizinkan onclick inline — pakai
+// event delegation untuk semua tombol pertanyaan FAQ.
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('.faq-question');
+  if (btn) toggleFaq(btn);
+});
 </script>
 </body>`);
 }
 
 function faqItem(question, answerHtml) {
   return `<div class="faq-item">
-    <button class="faq-question" onclick="toggleFaq(this)">
+    <button class="faq-question">
       <span>${escapeHtml(question)}</span>
       <span class="faq-arrow">▼</span>
     </button>

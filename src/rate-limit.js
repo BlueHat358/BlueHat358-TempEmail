@@ -3,14 +3,16 @@
 import { RATE_LIMITS } from "./config.js";
 
 /**
- * Ambil IP client dari request headers (Cloudflare selalu set CF-Connecting-IP)
+ * Ambil IP client dari request headers.
+ *
+ * [Fix H-3] Tidak lagi fallback ke X-Forwarded-For — header ini bisa
+ * dipalsukan oleh klien mana pun dan tidak bisa dipercaya untuk rate
+ * limiting. Cloudflare selalu menyuntik CF-Connecting-IP secara otomatis
+ * di edge (termasuk saat `wrangler dev`), jadi tidak ada alasan legit
+ * untuk fallback ke header yang bisa dikontrol klien.
  */
 export function getClientIp(request) {
-  return (
-    request.headers.get("CF-Connecting-IP") ||
-    request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim() ||
-    "unknown"
-  );
+  return request.headers.get("CF-Connecting-IP") || "unknown";
 }
 
 /**
@@ -18,7 +20,15 @@ export function getClientIp(request) {
  * Returns { allowed: boolean, remaining: number, resetIn: number }
  */
 export async function checkRateLimit(env, action, ip) {
-  if (!env.EMAILS || ip === "unknown") {
+  // [Fix H-3] Sebelumnya ip === "unknown" mengembalikan allowed:true
+  // (rate limit dimatikan total) — penyerang yang berhasil menghilangkan
+  // CF-Connecting-IP bisa bypass semua pembatasan. Sekarang fail closed:
+  // request tanpa IP yang bisa diidentifikasi akan ditolak.
+  if (ip === "unknown") {
+    return { allowed: false, remaining: 0, resetIn: 60 };
+  }
+
+  if (!env.EMAILS) {
     return { allowed: true, remaining: 999, resetIn: 60 };
   }
 

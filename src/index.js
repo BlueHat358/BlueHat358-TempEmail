@@ -11,6 +11,8 @@ import {
   isValidEmailId,
   isValidAttachmentId,
   sanitizeInboxName,
+  sanitizeFilenameForHeader,
+  generateNonce,
   listEmailRecords,
   getEmailRecord,
   getStats,
@@ -18,6 +20,7 @@ import {
   markAllEmailsRead,
   deleteEmail,
   deleteAllEmails,
+  isPreviewableType,
   jsonResponse,
   htmlResponse,
 } from "./utils.js";
@@ -42,12 +45,6 @@ function getDomainForHost(hostname, domains) {
 }
 
 function resolveInboxName(localPart, domain) {
-  // Jika input sudah berupa alamat lengkap (local@domain) — misalnya dikirim
-  // balik oleh client-side script yang menyimpan nama inbox penuh — pisahkan
-  // dulu local part dan domain SEBELUM disanitasi. Jangan sanitasi seluruh
-  // string langsung, karena sanitizeInboxName() membuang karakter '@',
-  // sehingga deteksi "sudah ada domain" jadi gagal dan domain malah
-  // ditempel dua kali (mis. "darkbluehat.eu.cc@bluehat.eu.cc").
   if (localPart.includes("@")) {
     const atIdx = localPart.indexOf("@");
     const local = sanitizeInboxName(localPart.slice(0, atIdx));
@@ -68,6 +65,7 @@ async function handleRequest(request, env, ctx) {
   const pathname = url.pathname;
   const method   = request.method;
   const ip       = getClientIp(request);
+  const nonce    = generateNonce(); // [Fix M-1] CSP script-src nonce per-request
 
   const domains      = parseDomainList(env);
   const queryDomain  = (url.searchParams.get("domain") || "").trim();
@@ -95,11 +93,16 @@ async function handleRequest(request, env, ctx) {
     });
   }
 
-  // ── CORS check untuk DELETE ──────────────────────────────────────
-  if (method === "DELETE") {
-    const origin = request.headers.get("Origin") || "";
-    if (origin && !allowedOrigins.some((a) => origin.startsWith(a))) {
-      return jsonResponse({ error: "Forbidden" }, 403);
+  // ── [Fix M-4] CSRF: verifikasi Origin/Referer untuk SEMUA endpoint
+  // mutasi (POST + DELETE), bukan hanya DELETE seperti sebelumnya.
+  // Browser modern selalu mengirim header Origin pada request POST/DELETE
+  // cross-site, sehingga ini efektif menolak request CSRF dari situs lain
+  // walau tanpa CSRF token. Request same-origin biasa (fetch dari app ini)
+  // selalu mengirim Origin yang valid, jadi tidak ada perubahan perilaku
+  // untuk pemakaian normal.
+  if (method === "POST" || method === "DELETE") {
+    if (!isTrustedRequest(request, allowedOrigins)) {
+      return jsonResponse({ error: "Forbidden — origin tidak dipercaya" }, 403);
     }
   }
 
@@ -107,18 +110,18 @@ async function handleRequest(request, env, ctx) {
   if (pathname === "/" && method === "GET") {
     const rl = await checkRateLimit(env, "page", ip);
     if (!rl.allowed) {
-      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`), 429);
+      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`, nonce), 429, nonce);
     }
-    return htmlResponse(renderHomePage({ domains, defaultDomain: hostDomain, forcedDomain: normalizedQuery, domain: resolvedDomain }));
+    return htmlResponse(renderHomePage({ domains, defaultDomain: hostDomain, forcedDomain: normalizedQuery, domain: resolvedDomain, nonce }), 200, nonce);
   }
 
   // ── GET /about ────────────────────────────────────────────────────
   if (pathname === "/about" && method === "GET") {
     const rl = await checkRateLimit(env, "page", ip);
     if (!rl.allowed) {
-      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`), 429);
+      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`, nonce), 429, nonce);
     }
-    return htmlResponse(renderAboutPage({ domains, domain: resolvedDomain }));
+    return htmlResponse(renderAboutPage({ domains, domain: resolvedDomain, nonce }), 200, nonce);
   }
 
   // ── /api/* ────────────────────────────────────────────────────────
@@ -132,14 +135,15 @@ async function handleRequest(request, env, ctx) {
   if (parts.length === 1 && method === "GET") {
     const rl = await checkRateLimit(env, "page", ip);
     if (!rl.allowed) {
-      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`), 429);
+      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`, nonce), 429, nonce);
     }
 
     const inboxName = resolveInboxName(decodeURIComponent(parts[0]), resolvedDomain);
     if (!isValidInboxName(inboxName)) {
       return htmlResponse(
-        errorPage("Nama inbox tidak valid", "Gunakan 3–64 karakter: huruf kecil (a–z), angka (0–9), titik (.), underscore (_), plus (+), atau tanda hubung (-). Tidak boleh diawali/diakhiri simbol."),
-        400
+        errorPage("Nama inbox tidak valid", "Gunakan 3–64 karakter: huruf kecil (a–z), angka (0–9), titik (.), underscore (_), plus (+), atau tanda hubung (-). Tidak boleh diawali/diakhiri simbol.", nonce),
+        400,
+        nonce
       );
     }
 
@@ -149,31 +153,53 @@ async function handleRequest(request, env, ctx) {
       ? emails.filter((e) => e.subject?.toLowerCase().includes(searchQuery) || e.from?.toLowerCase().includes(searchQuery))
       : emails;
 
-    return htmlResponse(renderInboxPage(inboxName, filtered, stats, searchQuery, { domains, domain: resolvedDomain }));
+    return htmlResponse(renderInboxPage(inboxName, filtered, stats, searchQuery, { domains, domain: resolvedDomain, nonce }), 200, nonce);
   }
 
   if (parts.length === 2 && method === "GET") {
     const rl = await checkRateLimit(env, "page", ip);
     if (!rl.allowed) {
-      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`), 429);
+      return htmlResponse(errorPage("429 — Terlalu Banyak Request", `Tunggu ${rl.resetIn} detik lalu coba lagi.`, nonce), 429, nonce);
     }
 
     const inboxName = resolveInboxName(decodeURIComponent(parts[0]), resolvedDomain);
     const emailId   = decodeURIComponent(parts[1]);
 
-    if (!isValidInboxName(inboxName)) return htmlResponse(errorPage("Nama inbox tidak valid"), 400);
-    if (!isValidEmailId(emailId))     return htmlResponse(errorPage("ID email tidak valid", "Format ID tidak dikenal."), 400);
+    if (!isValidInboxName(inboxName)) return htmlResponse(errorPage("Nama inbox tidak valid", "", nonce), 400, nonce);
+    if (!isValidEmailId(emailId))     return htmlResponse(errorPage("ID email tidak valid", "Format ID tidak dikenal.", nonce), 400, nonce);
 
     const email = await getEmailRecord(env, inboxName, emailId);
     if (!email) {
-      return htmlResponse(errorPage("Email tidak ditemukan", "Email mungkin sudah expired atau dihapus."), 404);
+      return htmlResponse(errorPage("Email tidak ditemukan", "Email mungkin sudah expired atau dihapus.", nonce), 404, nonce);
     }
 
     ctx.waitUntil(markEmailRead(env, inboxName, emailId));
-    return htmlResponse(renderEmailDetailPage(inboxName, email, { domain: resolvedDomain }));
+    return htmlResponse(renderEmailDetailPage(inboxName, email, { domain: resolvedDomain, nonce }), 200, nonce);
   }
 
-  return htmlResponse(errorPage("Halaman tidak ditemukan", "URL yang kamu buka tidak tersedia."), 404);
+  return htmlResponse(errorPage("Halaman tidak ditemukan", "URL yang kamu buka tidak tersedia.", nonce), 404, nonce);
+}
+
+/**
+ * [Fix M-4] Cek apakah request berasal dari origin yang dipercaya.
+ * Prioritas: header Origin (dikirim browser untuk request POST/DELETE,
+ * termasuk cross-site — sehingga bisa dibandingkan ke allowlist). Jika
+ * Origin tidak ada, fallback ke Referer. Request tanpa Origin maupun
+ * Referer (kemungkinan klien non-browser seperti curl/API) tetap
+ * diizinkan supaya endpoint API tidak rusak untuk pemakaian terprogram —
+ * CSRF secara definisi memerlukan browser korban, jadi klien non-browser
+ * tidak relevan untuk ancaman ini.
+ */
+function isTrustedRequest(request, allowedOrigins) {
+  const origin = request.headers.get("Origin");
+  if (origin) {
+    return allowedOrigins.some((a) => origin.startsWith(a));
+  }
+  const referer = request.headers.get("Referer");
+  if (referer) {
+    return allowedOrigins.some((a) => referer.startsWith(a));
+  }
+  return true; // tidak ada Origin/Referer sama sekali → bukan request browser
 }
 
 // ─────────────────────────────────────────────
@@ -272,9 +298,26 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomai
     const obj = await env.ATTACHMENTS.get(`att:${attId}`);
     if (!obj) return jsonResponse({ error: "File tidak ditemukan atau sudah expired" }, 404);
 
+    const contentType = obj.httpMetadata?.contentType || "application/octet-stream";
+
+    // Ambil nama file dari Content-Disposition yang tersimpan
+    const storedDisposition = obj.httpMetadata?.contentDisposition || "";
+    const filenameMatch     = /filename="?([^";]+)"?/i.exec(storedDisposition);
+    const rawFilename       = filenameMatch ? filenameMatch[1] : "file";
+    // [Fix M-2] Sanitasi lagi di sisi serve sebagai pertahanan berlapis,
+    // seandainya ada data lama (sebelum patch) yang belum tersanitasi.
+    const filename           = sanitizeFilenameForHeader(rawFilename);
+
+    // Preview inline (?view=1) hanya dihormati untuk tipe yang aman dirender
+    // langsung di browser. Tipe lain TETAP dipaksa "attachment" apapun query
+    // param-nya — supaya tidak ada celah XSS dari attachment HTML/SVG yang
+    // disajikan dari origin yang sama dengan aplikasi.
+    const wantInline   = url.searchParams.get("view") === "1";
+    const disposition  = wantInline && isPreviewableType(contentType) ? "inline" : "attachment";
+
     const headers = new Headers();
-    headers.set("Content-Type",           obj.httpMetadata?.contentType || "application/octet-stream");
-    headers.set("Content-Disposition",    obj.httpMetadata?.contentDisposition || `attachment; filename="file"`);
+    headers.set("Content-Type",           contentType);
+    headers.set("Content-Disposition",    `${disposition}; filename="${filename}"`);
     headers.set("Cache-Control",          "no-store");
     headers.set("X-Content-Type-Options", "nosniff");
     return new Response(obj.body, { headers });
@@ -295,23 +338,45 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomai
   }
 
   // GET /api/system/status
+  // [Fix H-1] Sebelumnya endpoint ini publik tanpa auth, membocorkan
+  // total_slots/used_slots/available_slots (detail kapasitas internal),
+  // dan tiap request memicu listing KV untuk SETIAP inbox yang pernah
+  // tercatat — operasi mahal yang bisa disalahgunakan untuk DoS.
+  // Sekarang: (1) hanya boolean is_full/is_almost_full yang dikembalikan,
+  // tanpa angka slot persis; (2) hasil dicache 30 detik di KV supaya
+  // listing mahal di atas tidak dieksekusi ulang tiap request.
   if (segments[0] === "system" && segments[1] === "status" && method === "GET") {
-    const countData    = await env.EMAILS.get("system:inbox-count", { type: "json" });
-    const knownInboxes = countData?.inboxes || [];
+    const rl = await checkRateLimit(env, "page", ip);
+    if (!rl.allowed) {
+      return jsonResponse({ error: "Terlalu banyak request", retryAfter: rl.resetIn }, 429, { "Retry-After": String(rl.resetIn) });
+    }
 
-    const activeChecks = await Promise.all(
-      knownInboxes.map(async (name) => {
-        const listed = await env.EMAILS.list({ prefix: `inbox:${name}:`, limit: 1 });
-        return listed.keys.length > 0 ? name : null;
-      })
-    );
-    const activeInboxes = activeChecks.filter(Boolean);
+    const cacheKey = "system:status-cache";
+    const cached = env.EMAILS ? await env.EMAILS.get(cacheKey, { type: "json" }) : null;
+
+    let usedSlots;
+    if (cached) {
+      usedSlots = cached.usedSlots;
+    } else {
+      const countData    = await env.EMAILS.get("system:inbox-count", { type: "json" });
+      const knownInboxes = countData?.inboxes || [];
+
+      const activeChecks = await Promise.all(
+        knownInboxes.map(async (name) => {
+          const listed = await env.EMAILS.list({ prefix: `inbox:${name}:`, limit: 1 });
+          return listed.keys.length > 0 ? name : null;
+        })
+      );
+      usedSlots = activeChecks.filter(Boolean).length;
+
+      await env.EMAILS.put(cacheKey, JSON.stringify({ usedSlots }), { expirationTtl: 30 });
+    }
+
+    const availableSlots = Math.max(0, MAX_TOTAL_INBOXES - usedSlots);
 
     return jsonResponse({
-      total_slots:     MAX_TOTAL_INBOXES,
-      used_slots:      activeInboxes.length,
-      available_slots: Math.max(0, MAX_TOTAL_INBOXES - activeInboxes.length),
-      is_full:         activeInboxes.length >= MAX_TOTAL_INBOXES,
+      is_full:        availableSlots <= 0,
+      is_almost_full: availableSlots > 0 && availableSlots <= 2,
     }, 200);
   }
 
@@ -349,14 +414,14 @@ async function handleScheduled(event, env, ctx) {
 // ─────────────────────────────────────────────
 // Error page HTML
 // ─────────────────────────────────────────────
-function errorPage(title, detail = "") {
+function errorPage(title, detail = "", nonce = "") {
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${escapeHtml(title)} — TempMail</title>
-  <script>
+  <script nonce="${nonce}">
     (function(){
       var s=localStorage.getItem('theme'),p=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';
       document.documentElement.classList.toggle('light',(s||p)==='light');
@@ -396,7 +461,8 @@ export default {
       return await handleRequest(request, env, ctx);
     } catch (err) {
       console.error("[worker] Unhandled error:", err);
-      return htmlResponse(errorPage("Internal Server Error", "Terjadi kesalahan internal. Coba lagi dalam beberapa saat."), 500);
+      const nonce = generateNonce();
+      return htmlResponse(errorPage("Internal Server Error", "Terjadi kesalahan internal. Coba lagi dalam beberapa saat.", nonce), 500, nonce);
     }
   },
 

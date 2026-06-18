@@ -525,7 +525,7 @@ function confirmDelete(msg, onConfirm) {
 // ─────────────────────────────────────────────
 // Base HTML shell
 // ─────────────────────────────────────────────
-export function baseLayout({ title, head = "", body, inboxName = null, brandDomain = "bluehat358.biz.id", emailTtlDays = 3 }) {
+export function baseLayout({ title, head = "", body, inboxName = null, brandDomain = "bluehat358.pp.ua", emailTtlDays = 3, nonce = "" }) {
   return `<!DOCTYPE html>
   <html lang="id">
   <head>
@@ -546,7 +546,7 @@ export function baseLayout({ title, head = "", body, inboxName = null, brandDoma
   ${head}
   </head>
   <body>
-  <script>
+  <script nonce="${nonce}">
   (function() {
     var saved = localStorage.getItem('theme');
     var prefer = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
@@ -561,7 +561,7 @@ export function baseLayout({ title, head = "", body, inboxName = null, brandDoma
   <div class="logo-icon">📬</div>
   <div>
   <div>BlueHat<span style="color:var(--accent)">358</span></div>
-  <div class="logo-sub">TempMail · @${escapeHtml(brandDomain || "bluehat358.biz.id")}</div>
+  <div class="logo-sub">TempMail · @${escapeHtml(brandDomain || "bluehat358.pp.ua")}</div>
   </div>
   </a>
   <div class="topbar-right">
@@ -570,7 +570,7 @@ export function baseLayout({ title, head = "", body, inboxName = null, brandDoma
     <span style="color:var(--overlay)">inbox:</span>
     <span style="color:var(--accent)">${escapeHtml(inboxName)}</span>
     </span>` : ""}
-    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">☀️ Latte</button>
+    <button class="theme-btn" id="theme-btn">☀️ Latte</button>
     </div>
     </div>
     </header>
@@ -599,12 +599,16 @@ export function baseLayout({ title, head = "", body, inboxName = null, brandDoma
 
     <div id="toast-container" class="toast-container"></div>
 
-    <script>
+    <script nonce="${nonce}">
     ${SHARED_JS}
-    // Set correct theme button label on load
+    // Set correct theme button label on load + wire klik (CSP nonce tidak
+    // mengizinkan atribut onclick inline, jadi dipasang via addEventListener)
     document.addEventListener('DOMContentLoaded', function() {
       var btn = document.getElementById('theme-btn');
-      if (btn) btn.textContent = getThemeLabel();
+      if (btn) {
+        btn.textContent = getThemeLabel();
+        btn.addEventListener('click', toggleTheme);
+      }
     });
       </script>
       </body>

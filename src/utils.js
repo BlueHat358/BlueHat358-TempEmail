@@ -58,17 +58,40 @@ const NOUNS = [
   "frost", "grove", "haven", "ivory", "jewel", "karma", "light"
 ];
 
+/**
+ * [Fix H-2] Sebelumnya: 24 adjektif x 21 noun x 90 angka (10-99) = 45.360
+ * kombinasi — bisa di-brute-force dalam hitungan jam. Sekarang ditambah
+ * suffix 8 karakter hex acak-kriptografis (crypto.getRandomValues, bukan
+ * Math.random yang predictable), sehingga entropi efektif naik ke
+ * 504 x 16^8 ≈ 2,2 triliun kombinasi.
+ */
 export function generateRandomInboxName() {
-  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  const num = Math.floor(Math.random() * 90 + 10); // 10-99
-  return `${adj}-${noun}-${num}`;
+  const adj = ADJECTIVES[secureRandomInt(ADJECTIVES.length)];
+  const noun = NOUNS[secureRandomInt(NOUNS.length)];
+  const suffixBytes = crypto.getRandomValues(new Uint8Array(4));
+  const suffix = Array.from(suffixBytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${adj}-${noun}-${suffix}`;
+}
+
+function secureRandomInt(maxExclusive) {
+  return crypto.getRandomValues(new Uint32Array(1))[0] % maxExclusive;
 }
 
 export function generateAttachmentId() {
-  const ts = Date.now().toString(36);
-  const rand = Math.random().toString(36).substring(2, 7);
-  return `${ts}${rand}`;
+  // [Fix M-3] crypto.randomUUID() menghasilkan 122 bit entropi acak murni —
+  // jauh lebih aman daripada timestamp (dapat ditebak) + 5 karakter acak.
+  return crypto.randomUUID().replace(/-/g, "");
+}
+
+/**
+ * [Fix M-1 helper] Nonce acak per-request untuk Content-Security-Policy.
+ * Dipakai supaya script-src bisa lepas dari 'unsafe-inline'.
+ */
+export function generateNonce() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
 }
 
 // ─────────────────────────────────────────────
@@ -254,13 +277,36 @@ async function updateStatsOnDelete(env, inboxName, unreadDelta) {
   });
 }
 
+/**
+ * [Fix M-2] Bersihkan nama file sebelum dipakai di header HTTP
+ * (Content-Disposition). Membuang karakter yang bisa memutus format header
+ * (tanda kutip, titik koma, CR/LF) atau dipakai untuk path traversal.
+ */
+export function sanitizeFilenameForHeader(filename) {
+  if (!filename || typeof filename !== "string") return "file";
+  const cleaned = filename
+    .replace(/[\r\n]/g, "")
+    .replace(/["\\;]/g, "_")
+    .replace(/[/\\]/g, "_")
+    .trim();
+  return cleaned.slice(0, 255) || "file";
+}
+
 // ─────────────────────────────────────────────
 // Security Headers
 // ─────────────────────────────────────────────
-export function addSecurityHeaders(headers = new Headers()) {
+export function addSecurityHeaders(headers = new Headers(), nonce = null) {
+  // [Fix M-1] script-src tidak lagi 'unsafe-inline' — memakai nonce acak
+  // per-request. Browser hanya akan menjalankan <script nonce="..."> yang
+  // nonce-nya cocok, sehingga skrip yang disuntikkan via celah XSS lain
+  // (yang tidak tahu nonce request ini) akan diblokir CSP sebagai lapisan
+  // pertahanan kedua. style-src tetap 'unsafe-inline' karena seluruh UI
+  // memakai inline style="" attribute secara ekstensif (risiko jauh lebih
+  // rendah daripada script-src untuk eksekusi kode).
+  const scriptSrc = nonce ? `'self' 'nonce-${nonce}'` : "'self'";
   headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-src 'self'"
+    `default-src 'self'; script-src ${scriptSrc}; style-src 'self' 'unsafe-inline'; frame-src 'self'; base-uri 'self'; form-action 'self'`
   );
   headers.set("X-Frame-Options", "DENY");
   headers.set("X-Content-Type-Options", "nosniff");
@@ -283,9 +329,10 @@ export function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), { status, headers: h });
 }
 
-export function htmlResponse(html, status = 200) {
+export function htmlResponse(html, status = 200, nonce = null) {
   const h = addSecurityHeaders(
-    new Headers({ "Content-Type": "text/html;charset=UTF-8" })
+    new Headers({ "Content-Type": "text/html;charset=UTF-8" }),
+    nonce
   );
   return new Response(html, { status, headers: h });
 }
@@ -339,11 +386,32 @@ export function isValidEmailId(id) {
 }
 
 /**
- * Validate attachment ID (base36 timestamp + random)
+ * Validate attachment ID — format baru: 32 karakter hex (crypto.randomUUID
+ * tanpa tanda hubung). Tetap menerima panjang 8-20 untuk kompatibilitas
+ * mundur dengan attachment lama (format timestamp+random) yang mungkin
+ * masih ada di KV/R2 sampai TTL-nya habis.
  */
 export function isValidAttachmentId(id) {
   if (!id || typeof id !== "string") return false;
-  return /^[a-z0-9]{8,20}$/i.test(id) && id.length <= 24;
+  return /^[a-z0-9]{8,32}$/i.test(id) && id.length <= 32;
+}
+
+/**
+ * Cek apakah sebuah content type aman untuk dipreview langsung (inline) di
+ * browser tanpa harus didownload dulu. Sengaja TIDAK termasuk text/html dan
+ * image/svg+xml — keduanya bisa membawa script, dan karena attachment
+ * disajikan dari origin yang sama dengan aplikasi, render inline untuk tipe
+ * itu berisiko XSS. Tipe lain di luar daftar ini selalu dipaksa download.
+ */
+export function isPreviewableType(contentType) {
+  if (!contentType || typeof contentType !== "string") return false;
+  const ct = contentType.toLowerCase().split(";")[0].trim();
+  if (ct === "application/pdf") return true;
+  if (ct === "text/plain") return true;
+  if (ct.startsWith("image/") && ct !== "image/svg+xml") return true;
+  if (ct.startsWith("audio/")) return true;
+  if (ct.startsWith("video/")) return true;
+  return false;
 }
 
 /**

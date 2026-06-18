@@ -4,8 +4,8 @@ import { baseLayout, escapeHtml } from "../theme.js";
 import { timeAgo, formatBytes, formatExpiry, isExpiringSoon } from "../utils.js";
 import { POLL_INTERVAL_SEC, INBOX_QUOTA_DISPLAY, INBOX_WARN_THRESHOLD, MAX_EMAILS_PER_INBOX, EMAIL_TTL_DAYS } from "../config.js";
 
-export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { domains = [], domain = "" } = {}) {
-  const currentDomain = domain || domains[0] || "bluehat358.eu.cc";
+export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { domains = [], domain = "", nonce = "" } = {}) {
+  const currentDomain = domain || domains[0] || "bluehat358.pp.ua";
   const localPart     = inboxName.includes("@") ? inboxName.split("@")[0] : inboxName;
   const emailAddr     = `${localPart}@${currentDomain}`;
   const unread        = emails.filter((e) => !e.read).length;
@@ -42,7 +42,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
 
           <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
             <code style="background:var(--mantle);border:1px solid var(--surface1);padding:0.35rem 0.85rem;border-radius:var(--radius-md);font-size:0.9rem;color:var(--text);display:inline-block;">${escapeHtml(emailAddr)}</code>
-            <button class="btn btn-sm btn-secondary" onclick="copyToClipboard('${escapeHtml(emailAddr)}', 'Alamat email')">📋 Salin</button>
+            <button class="btn btn-sm btn-secondary" id="copy-email-btn" data-copy="${escapeHtml(emailAddr)}">📋 Salin</button>
           </div>
 
           <div style="margin-top:0.75rem;display:flex;gap:1.25rem;flex-wrap:wrap;color:var(--subtext);font-size:0.8rem;">
@@ -56,9 +56,9 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
         </div>
 
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-start;">
-          <button class="btn btn-sm btn-secondary" onclick="refreshInbox()" id="refresh-btn">🔄 Refresh</button>
-          <button class="btn btn-sm btn-primary" id="mark-all-read-btn" onclick="markAllRead()" ${unread > 0 ? "" : 'style="display:none;"'}>✅ Tandai Semua Dibaca</button>
-          ${emails.length > 0 ? `<button class="btn btn-sm btn-danger" onclick="deleteAll()">🗑️ Hapus Semua</button>` : ""}
+          <button class="btn btn-sm btn-secondary" id="refresh-btn">🔄 Refresh</button>
+          <button class="btn btn-sm btn-primary" id="mark-all-read-btn" ${unread > 0 ? "" : 'style="display:none;"'}>✅ Tandai Semua Dibaca</button>
+          ${emails.length > 0 ? `<button class="btn btn-sm btn-danger" data-action="delete-all">🗑️ Hapus Semua</button>` : ""}
         </div>
       </div>
 
@@ -77,7 +77,7 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
     <div style="background:var(--surface);border:1px solid var(--surface1);border-radius:var(--radius-md);padding:0.85rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem;">
       <span style="color:var(--overlay);font-size:1rem;">🔍</span>
       <input type="text" id="search-input" placeholder="Cari berdasarkan subjek atau pengirim..."
-        value="${escapeHtml(searchQuery)}" oninput="handleSearch(this.value)"
+        value="${escapeHtml(searchQuery)}"
         style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:0.875rem;">
       <a id="search-clear-link" href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}"
         style="color:var(--overlay);font-size:0.8rem;text-decoration:none;white-space:nowrap;padding:0.25rem 0.6rem;background:var(--surface1);border-radius:var(--radius-sm);${searchQuery ? "" : "display:none;"}">✕ Hapus</a>
@@ -100,15 +100,21 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
           <div>
             <strong>Inbox hampir penuh!</strong> Sudah ${totalEmails}/${INBOX_QUOTA_DISPLAY} email.
             Email baru akan di-drop jika inbox sudah penuh.
-            <button onclick="deleteAll()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:inherit;font-size:inherit;text-decoration:underline;padding:0;">Hapus semua sekarang</button>
+            <button data-action="delete-all" style="background:none;border:none;color:var(--accent);cursor:pointer;font-family:inherit;font-size:inherit;text-decoration:underline;padding:0;">Hapus semua sekarang</button>
           </div>
         </div>`
       : ""}
   `;
 
-  const page = baseLayout({ title: `Inbox: ${localPart}`, inboxName, body, brandDomain: currentDomain, emailTtlDays: EMAIL_TTL_DAYS });
+  const head = `<style>
+    /* [Fix M-1] pengganti onmouseover/onmouseout inline (CSP nonce tidak
+       mengizinkan inline event handler attribute) */
+    .email-row:hover { border-color: var(--accent) !important; box-shadow: var(--shadow); }
+  </style>`;
 
-  return page.replace("</body>", `<script>
+  const page = baseLayout({ title: `Inbox: ${localPart}`, inboxName, head, body, brandDomain: currentDomain, emailTtlDays: EMAIL_TTL_DAYS, nonce });
+
+  return page.replace("</body>", `<script nonce="${nonce}">
 // ── Config (disuntikkan dari server) ─────────────────────────────────────
 var INBOX         = '${escapeHtml(inboxName)}';
 var INBOX_LOCAL   = '${escapeHtml(localPart)}';
@@ -347,7 +353,7 @@ function buildEmailRowHtml(email) {
   var border   = isUnread ? 'var(--accent)' : 'var(--surface1)';
   var inboxEnc = encodeURIComponent(INBOX_LOCAL);
   var emailEnc = encodeURIComponent(email.id);
-  return '<div id="email-row-' + email.id + '" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
+  return '<div id="email-row-' + email.id + '" class="email-row" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
     '<a href="/' + inboxEnc + '/' + emailEnc + '?domain=' + encodeURIComponent(DOMAIN) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
         '<div style="flex:1;min-width:0;">' +
@@ -382,22 +388,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Search input keyboard
+  // Search input keyboard + input
   var si = document.getElementById('search-input');
   if (si) {
+    si.addEventListener('input', function() { handleSearch(si.value); });
     si.addEventListener('keydown', function(e) {
       if (e.key === 'Enter')  { clearTimeout(searchTimer); handleSearch(si.value); }
       if (e.key === 'Escape') { si.value = ''; handleSearch(''); }
     });
   }
+
+  // [Fix M-1] Tombol-tombol ini sebelumnya pakai onclick inline — CSP
+  // nonce-based tidak mengizinkannya, jadi dipasang lewat addEventListener.
+  var copyBtn = document.getElementById('copy-email-btn');
+  if (copyBtn) copyBtn.addEventListener('click', function() { copyToClipboard(copyBtn.dataset.copy, 'Alamat email'); });
+
+  var refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshInbox);
+
+  var markAllBtn = document.getElementById('mark-all-read-btn');
+  if (markAllBtn) markAllBtn.addEventListener('click', markAllRead);
 });
 
-// Delete button delegation
+// Delete button & "Hapus Semua" delegation
 document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-action="delete"]');
-  if (!btn) return;
-  e.stopPropagation();
-  deleteSingleEmail(decodeURIComponent(btn.dataset.id));
+  var delBtn = e.target.closest('[data-action="delete"]');
+  if (delBtn) {
+    e.stopPropagation();
+    deleteSingleEmail(decodeURIComponent(delBtn.dataset.id));
+    return;
+  }
+  var delAllBtn = e.target.closest('[data-action="delete-all"]');
+  if (delAllBtn) deleteAll();
 });
 </script>
 </body>`);
@@ -412,7 +434,7 @@ function renderEmailRow(inboxName, email, currentDomain) {
   const expiryLabel  = email.expiresAt ? formatExpiry(email.expiresAt) : "";
 
   return `
-  <div id="email-row-${escapeHtml(email.id)}" style="
+  <div id="email-row-${escapeHtml(email.id)}" class="email-row" style="
     background:var(--surface);
     border:1px solid ${isUnread ? "var(--accent)" : "var(--surface1)"};
     border-left:3px solid ${isUnread ? "var(--accent)" : expiringSoon ? "var(--yellow)" : "var(--surface1)"};
@@ -420,8 +442,7 @@ function renderEmailRow(inboxName, email, currentDomain) {
     margin-bottom:0.5rem;
     transition:border-color 150ms ease, box-shadow 150ms ease, opacity 300ms, transform 300ms;
     overflow:hidden;
-  " onmouseover="this.style.borderColor='var(--accent)';this.style.boxShadow='var(--shadow)'"
-     onmouseout="this.style.borderColor='${isUnread ? "var(--accent)" : "var(--surface1)"}';this.style.boxShadow='none'">
+  ">
     <a href="/${encodeURIComponent(localPart)}/${encodeURIComponent(email.id)}?domain=${encodeURIComponent(currentDomain)}"
        style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">

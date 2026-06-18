@@ -13,6 +13,7 @@ import {
   isValidInboxName,
   sanitizeInboxName,
   generateAttachmentId,
+  sanitizeFilenameForHeader,
   KV_KEYS,
   listEmailRecords,
   saveEmailRecord,
@@ -100,6 +101,11 @@ export async function handleIncomingEmail(message, env, ctx) {
 
     // ── 6. Process attachments ────────────────────────────────────────
     const attachmentMetas = [];
+    // Pemetaan Content-ID (gambar/file inline) → URL attachment, supaya
+    // referensi "cid:..." pada htmlBody bisa diganti jadi URL yang bisa
+    // di-load browser. Tanpa ini, gambar inline/embedded (mis. screenshot
+    // yang ditempel langsung di body email) akan tampil sebagai broken image.
+    const cidMap = new Map();
 
     for (const att of parsed.attachments || []) {
       const attId       = generateAttachmentId();
@@ -115,14 +121,36 @@ export async function handleIncomingEmail(message, env, ctx) {
         console.log(`[email] Attachment "${filename}" skipped (${(size / 1024 / 1024).toFixed(1)} MB > ${MAX_ATTACHMENT_SIZE / 1024 / 1024} MB limit)`);
         meta.skipped = true;
       } else if (content) {
+        // [Fix M-2] filename dari email masuk tidak dipercaya — bisa berisi
+        // tanda kutip, titik koma, atau newline yang memutus format header
+        // Content-Disposition (header injection / filename spoofing).
+        const safeFilename = sanitizeFilenameForHeader(filename);
         await env.ATTACHMENTS.put(`att:${attId}`, content, {
-          httpMetadata: { contentType, contentDisposition: `attachment; filename="${filename}"` },
+          httpMetadata: { contentType, contentDisposition: `attachment; filename="${safeFilename}"` },
           customMetadata: { expiresAt: String(attExpiresAt), inboxName },
         });
         await env.EMAILS.put(KV_KEYS.attachment(attId), JSON.stringify(meta), { expirationTtl: attTtlSec });
+
+        // Header Content-ID datang dalam format "<xxxx@yyyy>" — strip tanda
+        // kurung siku karena referensi di HTML ("cid:xxxx@yyyy") tidak memakainya.
+        if (att.contentId) {
+          const cid = String(att.contentId).trim().replace(/^<|>$/g, "");
+          if (cid) cidMap.set(cid, attId);
+        }
       }
 
       attachmentMetas.push(meta);
+    }
+
+    // Ganti semua referensi "cid:xxx" di HTML body dengan URL attachment asli
+    let htmlBody = parsed.html || "";
+    if (htmlBody && cidMap.size > 0) {
+      htmlBody = htmlBody.replace(/cid:([^"'\s)>]+)/gi, (full, rawCid) => {
+        let cid = rawCid;
+        try { cid = decodeURIComponent(rawCid); } catch {}
+        const attId = cidMap.get(cid) || cidMap.get(rawCid);
+        return attId ? `/api/attachments/${attId}` : full;
+      });
     }
 
     // ── 7. Build & save EmailRecord ───────────────────────────────────
@@ -135,7 +163,7 @@ export async function handleIncomingEmail(message, env, ctx) {
       from: fromField, to: toAddress,
       subject:  parsed.subject || "(Tanpa Judul)",
       body:     parsed.text    || "",
-      htmlBody: parsed.html    || "",
+      htmlBody,
       date:     parsed.date ? new Date(parsed.date).toISOString() : new Date(receivedAt).toISOString(),
       receivedAt, read: false, expiresAt,
       attachments: attachmentMetas,
