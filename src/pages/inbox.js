@@ -116,9 +116,9 @@ export function renderInboxPage(inboxName, emails, stats, searchQuery = "", { do
 
   return page.replace("</body>", `<script nonce="${nonce}">
 // ── Config (disuntikkan dari server) ─────────────────────────────────────
-var INBOX         = '${escapeHtml(inboxName)}';
-var INBOX_LOCAL   = '${escapeHtml(localPart)}';
-var DOMAIN        = '${escapeHtml(currentDomain)}';
+var INBOX         = ${JSON.stringify(inboxName)};
+var INBOX_LOCAL   = ${JSON.stringify(localPart)};
+var DOMAIN        = ${JSON.stringify(currentDomain)};
 var CURRENT_TOTAL = ${totalEmails};
 var POLL_INTERVAL = ${POLL_INTERVAL_SEC}; // detik — ubah di src/config.js
 
@@ -256,7 +256,7 @@ function refreshEmailList() {
 // ── Email actions ─────────────────────────────────────────────────────────
 function deleteAll() {
   confirmDelete('Hapus semua email di inbox ini?', function() {
-    fetch('/api/inbox/' + INBOX, { method: 'DELETE' })
+    fetch('/api/inbox/' + encodeURIComponent(INBOX), { method: 'DELETE' })
       .then(function(r) {
         if (r.ok) {
           document.getElementById('email-list').innerHTML = renderEmptyList();
@@ -272,7 +272,7 @@ function deleteAll() {
 
 function deleteSingleEmail(emailId) {
   confirmDelete('Hapus email ini?', function() {
-    fetch('/api/inbox/' + INBOX + '/' + emailId, { method: 'DELETE' })
+    fetch('/api/inbox/' + encodeURIComponent(INBOX) + '/' + emailId, { method: 'DELETE' })
       .then(function(r) {
         if (r.ok) {
           var row = document.getElementById('email-row-' + emailId);
@@ -353,7 +353,7 @@ function buildEmailRowHtml(email) {
   var border   = isUnread ? 'var(--accent)' : 'var(--surface1)';
   var inboxEnc = encodeURIComponent(INBOX_LOCAL);
   var emailEnc = encodeURIComponent(email.id);
-  return '<div id="email-row-' + email.id + '" class="email-row" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
+  return '<div id="email-row-' + escHtml(email.id) + '" class="email-row" style="background:var(--surface);border:1px solid ' + border + ';border-left:3px solid ' + border + ';border-radius:var(--radius-md);margin-bottom:0.5rem;overflow:hidden;">' +
     '<a href="/' + inboxEnc + '/' + emailEnc + '?domain=' + encodeURIComponent(DOMAIN) + '" style="display:block;padding:1rem 1.25rem;text-decoration:none;color:inherit;">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.75rem;flex-wrap:wrap;">' +
         '<div style="flex:1;min-width:0;">' +

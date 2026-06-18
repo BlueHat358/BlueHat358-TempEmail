@@ -28,7 +28,7 @@ export async function checkRateLimit(env, action, ip) {
     return { allowed: false, remaining: 0, resetIn: 60 };
   }
 
-  if (!env.TEMP-EMAILS) {
+  if (!env.EMAILS) {
     return { allowed: true, remaining: 999, resetIn: 60 };
   }
 
@@ -37,15 +37,15 @@ export async function checkRateLimit(env, action, ip) {
   const key    = `rl:${action}:${ip}`;
 
   try {
-    const existing = await env.TEMP-EMAILS.get(key, { type: "json" });
+    const existing = await env.EMAILS.get(key, { type: "json" });
 
     if (!existing) {
-      await env.TEMP-EMAILS.put(key, JSON.stringify({ count: 1, windowStart: now }), { expirationTtl: config.windowSec + 10 });
+      await env.EMAILS.put(key, JSON.stringify({ count: 1, windowStart: now }), { expirationTtl: config.windowSec + 10 });
       return { allowed: true, remaining: config.max - 1, resetIn: config.windowSec };
     }
 
     if (existing.windowStart < now - config.windowSec) {
-      await env.TEMP-EMAILS.put(key, JSON.stringify({ count: 1, windowStart: now }), { expirationTtl: config.windowSec + 10 });
+      await env.EMAILS.put(key, JSON.stringify({ count: 1, windowStart: now }), { expirationTtl: config.windowSec + 10 });
       return { allowed: true, remaining: config.max - 1, resetIn: config.windowSec };
     }
 
@@ -54,7 +54,7 @@ export async function checkRateLimit(env, action, ip) {
       return { allowed: false, remaining: 0, resetIn: Math.max(1, resetIn) };
     }
 
-    await env.TEMP-EMAILS.put(
+    await env.EMAILS.put(
       key,
       JSON.stringify({ count: existing.count + 1, windowStart: existing.windowStart }),
       { expirationTtl: config.windowSec + 10 }
@@ -67,7 +67,7 @@ export async function checkRateLimit(env, action, ip) {
     };
   } catch (err) {
     console.warn("[rate-limit] KV error:", err);
-    return { allowed: true, remaining: 99, resetIn: 60 };
+    return { allowed: true, remaining: 1, resetIn: 30 };
   }
 }
 

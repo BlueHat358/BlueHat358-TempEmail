@@ -46,7 +46,7 @@ export async function handleIncomingEmail(message, env, ctx) {
     const existingEmails = await listEmailRecords(env, inboxName);
     if (existingEmails.length === 0) {
       const inboxCountKey = "system:inbox-count";
-      const countData     = await env.TEMP-EMAILS.get(inboxCountKey, { type: "json" });
+      const countData     = await env.EMAILS.get(inboxCountKey, { type: "json" });
       let knownInboxes    = countData?.inboxes || [];
 
       const activeChecks = await Promise.all(
@@ -65,7 +65,7 @@ export async function handleIncomingEmail(message, env, ctx) {
         knownInboxes.push(inboxName);
       }
 
-      await env.TEMP-EMAILS.put(inboxCountKey, JSON.stringify({ inboxes: knownInboxes }), {
+      await env.EMAILS.put(inboxCountKey, JSON.stringify({ inboxes: knownInboxes }), {
         expirationTtl: STATS_TTL_DAYS * 24 * 60 * 60,
       });
     }
@@ -88,10 +88,10 @@ export async function handleIncomingEmail(message, env, ctx) {
     }
 
     // ── 5. Build email ID ─────────────────────────────────────────────
-    let emailId = String(Date.now());
-    const collisionCheck = await env.TEMP-EMAILS.get(KV_KEYS.email(inboxName, emailId));
+    let emailId = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const collisionCheck = await env.EMAILS.get(KV_KEYS.email(inboxName, emailId));
     if (collisionCheck) {
-      emailId = emailId + "-" + Math.random().toString(36).substring(2, 7);
+      emailId = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
     }
 
     const receivedAt  = Date.now();
@@ -125,11 +125,11 @@ export async function handleIncomingEmail(message, env, ctx) {
         // tanda kutip, titik koma, atau newline yang memutus format header
         // Content-Disposition (header injection / filename spoofing).
         const safeFilename = sanitizeFilenameForHeader(filename);
-        await env.TEMP-ATTACHMENTS.put(`att:${attId}`, content, {
+        await env.ATTACHMENTS.put(`att:${attId}`, content, {
           httpMetadata: { contentType, contentDisposition: `attachment; filename="${safeFilename}"` },
           customMetadata: { expiresAt: String(attExpiresAt), inboxName },
         });
-        await env.TEMP-EMAILS.put(KV_KEYS.attachment(attId), JSON.stringify(meta), { expirationTtl: attTtlSec });
+        await env.EMAILS.put(KV_KEYS.attachment(attId), JSON.stringify(meta), { expirationTtl: attTtlSec });
 
         // Header Content-ID datang dalam format "<xxxx@yyyy>" — strip tanda
         // kurung siku karena referensi di HTML ("cid:xxxx@yyyy") tidak memakainya.
