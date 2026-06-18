@@ -295,7 +295,7 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomai
     const attId = decodeURIComponent(segments[1]);
     if (!isValidAttachmentId(attId)) return jsonResponse({ error: "ID attachment tidak valid" }, 400);
 
-    const obj = await env.TEMP-ATTACHMENTS.get(`att:${attId}`);
+    const obj = await env.TEMP_ATTACHMENTS.get(`att:${attId}`);
     if (!obj) return jsonResponse({ error: "File tidak ditemukan atau sudah expired" }, 404);
 
     const contentType = obj.httpMetadata?.contentType || "application/octet-stream";
@@ -352,24 +352,24 @@ async function handleApiRoute(pathname, method, url, env, ctx, ip, resolvedDomai
     }
 
     const cacheKey = "system:status-cache";
-    const cached = env.TEMP-EMAILS ? await env.TEMP-EMAILS.get(cacheKey, { type: "json" }) : null;
+    const cached = env.TEMP_MAILS ? await env.TEMP_MAILS.get(cacheKey, { type: "json" }) : null;
 
     let usedSlots;
     if (cached) {
       usedSlots = cached.usedSlots;
     } else {
-      const countData    = await env.TEMP-EMAILS.get("system:inbox-count", { type: "json" });
+      const countData    = await env.TEMP_MAILS.get("system:inbox-count", { type: "json" });
       const knownInboxes = countData?.inboxes || [];
 
       const activeChecks = await Promise.all(
         knownInboxes.map(async (name) => {
-          const listed = await env.TEMP-EMAILS.list({ prefix: `inbox:${name}:`, limit: 1 });
+          const listed = await env.TEMP_MAILS.list({ prefix: `inbox:${name}:`, limit: 1 });
           return listed.keys.length > 0 ? name : null;
         })
       );
       usedSlots = activeChecks.filter(Boolean).length;
 
-      await env.TEMP-EMAILS.put(cacheKey, JSON.stringify({ usedSlots }), { expirationTtl: 30 });
+      await env.TEMP_MAILS.put(cacheKey, JSON.stringify({ usedSlots }), { expirationTtl: 30 });
     }
 
     const availableSlots = Math.max(0, MAX_TOTAL_INBOXES - usedSlots);
@@ -394,11 +394,11 @@ async function handleScheduled(event, env, ctx) {
 
   try {
     do {
-      const list = await env.TEMP-ATTACHMENTS.list({ cursor, limit: 1000 });
+      const list = await env.TEMP_ATTACHMENTS.list({ cursor, limit: 1000 });
       for (const obj of list.objects) {
         const exp = obj.customMetadata?.expiresAt;
         if (exp && now > Number(exp)) {
-          await env.TEMP-ATTACHMENTS.delete(obj.key);
+          await env.TEMP_ATTACHMENTS.delete(obj.key);
           deleted++;
         }
       }
