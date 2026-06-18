@@ -12,7 +12,7 @@ id      = "GANTI_DENGAN_KV_NAMESPACE_ID"
 # ─── R2 Bucket ──────────────────────────────────────────────────────────────
 [[r2_buckets]]
 binding     = "TEMP-ATTACHMENTS"
-bucket_name = "bluehat358-attachments"
+bucket_name = "temp-mail-attachments"
 
 # ─── Cron Trigger — cleanup R2 expired tiap jam ────────────────────────────
 [triggers]
