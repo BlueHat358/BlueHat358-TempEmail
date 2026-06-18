@@ -1,6 +1,6 @@
 # BlueHat358 TempMail — Fase 3
 
-> Cloudflare Workers · KV · R2 · Durable Objects · @bluehat358.biz.id
+> Cloudflare Workers · KV · R2 · Durable Objects · @bluehat358.eu.cc
 
 Fase 3 melanjutkan Fase 2 dengan mengaktifkan fitur-fitur lanjutan:
 **SSE real-time via Durable Objects**, **rate limiting upgrade**, dan **auto-refresh email list**.
@@ -9,14 +9,14 @@ Fase 3 melanjutkan Fase 2 dengan mengaktifkan fitur-fitur lanjutan:
 
 ## ✅ Yang Baru di Fase 3
 
-| Fitur | Status |
-|---|---|
-| SSE real-time via Durable Objects (`InboxBroadcaster`) | ✅ Baru |
-| Auto-refresh email list saat ada email baru | ✅ Baru |
-| Handle event `email-deleted` via SSE | ✅ Baru |
-| Rate limit untuk SSE connections (10/menit/IP) | ✅ Baru |
-| Endpoint `/api/connections/{name}` — hitung SSE aktif | ✅ Baru |
-| Broadcast `email-deleted` saat email dihapus via API | ✅ Baru |
+| Fitur                                                   | Status           |
+| ------------------------------------------------------- | ---------------- |
+| SSE real-time via Durable Objects (`InboxBroadcaster`)  | ✅ Baru          |
+| Auto-refresh email list saat ada email baru             | ✅ Baru          |
+| Handle event `email-deleted` via SSE                    | ✅ Baru          |
+| Rate limit untuk SSE connections (10/menit/IP)          | ✅ Baru          |
+| Endpoint `/api/connections/{name}` — hitung SSE aktif   | ✅ Baru          |
+| Broadcast `email-deleted` saat email dihapus via API    | ✅ Baru          |
 | Fallback polling tetap berfungsi jika DO tidak tersedia | ✅ Dipertahankan |
 
 ---
@@ -39,7 +39,7 @@ Browser                     Worker                    Durable Object
 ```
 
 **Kenapa WebSocket DO → SSE Worker, bukan langsung SSE DO?**
-Cloudflare Durable Objects tidak mendukung streaming SSE langsung ke browser. 
+Cloudflare Durable Objects tidak mendukung streaming SSE langsung ke browser.
 Polanya: Worker membuat SSE stream ke browser, lalu bridge via WebSocket ke DO.
 DO menjaga daftar semua WS aktif dan broadcast ke semuanya saat ada email baru.
 
@@ -72,9 +72,10 @@ fase3/
 ## 🚀 Deploy ke Cloudflare
 
 ### Prasyarat (dari Fase 1 & 2)
+
 - KV namespace `EMAILS` sudah dibuat dan ID diisi di `wrangler.toml`
 - R2 bucket `bluehat358-attachments` sudah dibuat
-- Email Routing wildcard rule `*@bluehat358.biz.id` → Worker sudah aktif
+- Email Routing wildcard rule `*@bluehat358.eu.cc` → Worker sudah aktif
 
 ### Langkah Deploy Fase 3
 
@@ -90,7 +91,7 @@ wrangler durable-objects list
 # Harus ada: InboxBroadcaster
 
 # 4. Tes SSE
-curl -N https://bluehat358.biz.id/events/test-inbox
+curl -N https://bluehat358.eu.cc/events/test-inbox
 # Harus muncul: event: ping\ndata: {}\n\n
 
 # 5. Monitor logs
@@ -98,6 +99,7 @@ npm run tail
 ```
 
 ### Aktifkan DO di wrangler.toml
+
 File `wrangler.toml` sudah dikonfigurasi. Pastikan bagian ini **tidak** dikomentari:
 
 ```toml
@@ -114,12 +116,13 @@ new_classes = ["InboxBroadcaster"]
 
 ## 🔌 Endpoint Baru (Fase 3)
 
-| Endpoint | Method | Deskripsi |
-|---|---|---|
-| `/events/{inboxName}` | GET | SSE stream (sekarang via DO, bukan ping-only) |
-| `/api/connections/{name}` | GET | Jumlah SSE connections aktif di inbox |
+| Endpoint                  | Method | Deskripsi                                     |
+| ------------------------- | ------ | --------------------------------------------- |
+| `/events/{inboxName}`     | GET    | SSE stream (sekarang via DO, bukan ping-only) |
+| `/api/connections/{name}` | GET    | Jumlah SSE connections aktif di inbox         |
 
 ### GET /api/connections/{name}
+
 ```json
 {
   "connections": 3,
@@ -143,6 +146,7 @@ data: {}
 ```
 
 **Client behavior:**
+
 - `new-email` → auto-refresh daftar email + toast notifikasi
 - `email-deleted` → hapus baris email dari DOM dengan animasi
 - `ping` → keep-alive, tidak perlu aksi
@@ -166,6 +170,7 @@ data: {}
 ## 🔄 Kompatibilitas dengan Fase 1 & 2
 
 Fase 3 **sepenuhnya backward compatible**:
+
 - Semua KV schema, R2 key format, dan endpoint API tidak berubah
 - Jika `INBOX_BROADCASTER` binding tidak tersedia (misal lokal dev), Worker otomatis fallback ke SSE ping-only
 - Polling fallback (`/?check={inbox}`) tetap berfungsi normal
@@ -182,12 +187,12 @@ Fase 3 **sepenuhnya backward compatible**:
 
 ## 📊 Estimasi Penggunaan DO (Free Plan)
 
-| Resource | Batas | Estimasi |
-|---|---|---|
-| DO Requests | 1 juta/bulan | 1 broadcast per email masuk + 1 subscribe per user view |
-| DO Duration | 400.000 GB-detik/bulan | DO aktif selama ada koneksi WS. Idle DO hibernate otomatis |
-| DO Storage | 1 GB | InboxBroadcaster tidak menyimpan ke storage DO (state di memory) |
+| Resource    | Batas                  | Estimasi                                                         |
+| ----------- | ---------------------- | ---------------------------------------------------------------- |
+| DO Requests | 1 juta/bulan           | 1 broadcast per email masuk + 1 subscribe per user view          |
+| DO Duration | 400.000 GB-detik/bulan | DO aktif selama ada koneksi WS. Idle DO hibernate otomatis       |
+| DO Storage  | 1 GB                   | InboxBroadcaster tidak menyimpan ke storage DO (state di memory) |
 
 ---
 
-*BlueHat358 TempMail · Fase 3 · Juni 2026 · Catppuccin Mocha + Latte*
+_BlueHat358 TempMail · Fase 3 · Juni 2026 · Catppuccin Mocha + Latte_

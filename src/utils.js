@@ -92,10 +92,9 @@ export async function getEmailRecord(env, inboxName, emailId) {
 }
 
 /**
- * Save an email record with 7-day TTL
+ * Save an email record — ttlSec selalu dipass dari email-handler via config.js (EMAIL_TTL_DAYS)
  */
-export async function saveEmailRecord(env, record, ttlSec = 259200) {
-  // ttlSec default = 259200 = 3 hari (personal limit)
+export async function saveEmailRecord(env, record, ttlSec) {
   const key = KV_KEYS.email(record.inboxName, record.id);
   await env.EMAILS.put(key, JSON.stringify(record), {
     expirationTtl: ttlSec,

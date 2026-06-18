@@ -2,9 +2,15 @@
 // Fase: multi-domain support with select box
 
 import { baseLayout, escapeHtml } from "../theme.js";
+import {
+  EMAIL_TTL_DAYS,
+  ATTACHMENT_TTL_DAYS,
+  MAX_ATTACHMENT_SIZE_MB,
+  POLL_INTERVAL_SEC,
+} from "../config.js";
 
 export function renderHomePage({ domains = [], defaultDomain = "", domain = "" } = {}) {
-  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.biz.id";
+  const currentDomain = domain || defaultDomain || domains[0] || "bluehat358.eu.cc";
 
   const domainOptions = domains.map((d) =>
   `<option value="${escapeHtml(d)}"${d === currentDomain ? ' selected' : ''}>${escapeHtml(d)}</option>`
@@ -34,7 +40,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   <span style="font-size:1.4rem;">🚫</span>
   <div>
   <strong style="color:var(--red);">Sistem Penuh</strong><br>
-  <span style="color:var(--subtext);">Semua slot alamat email sedang terpakai. Slot akan terbuka otomatis setelah pesan lama kedaluwarsa (3 hari). Coba lagi nanti.</span>
+  <span style="color:var(--subtext);">Semua slot alamat email sedang terpakai. Slot akan terbuka otomatis setelah pesan lama kedaluwarsa (${EMAIL_TTL_DAYS} hari). Coba lagi nanti.</span>
   </div>
   </div>
 
@@ -91,7 +97,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   font-family:'Space Grotesk',sans-serif;
   ">
   Inbox instan di <code style="color:var(--accent)" id="hero-domain-display">@${escapeHtml(currentDomain)}</code>.
-  Tanpa daftar, tanpa password. Email otomatis hilang dalam 7 hari.
+  Tanpa daftar, tanpa password. Email otomatis hilang dalam ${EMAIL_TTL_DAYS} hari.
   </p>
 
   <!-- Inbox form -->
@@ -177,8 +183,8 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   ">
   ${featureCard("⚡", "Instan", "Inbox langsung aktif saat kamu buka. Tidak perlu verifikasi apapun.")}
   ${featureCard("🔒", "Anonim", "Tidak ada akun, tidak ada cookie tracking, tidak ada log aktivitas.")}
-  ${featureCard("📎", "Attachment", "Terima email dengan lampiran hingga 10 MB. Disimpan di Cloudflare R2.")}
-  ${featureCard("⏱️", "Auto-Hapus", "Email otomatis kedaluwarsa dalam 7 hari. Attachment dalam 8 hari.")}
+  ${featureCard("📎", "Attachment", "Terima email dengan lampiran hingga ${MAX_ATTACHMENT_SIZE_MB} MB. Disimpan di Cloudflare R2.")}
+  ${featureCard("⏱️", "Auto-Hapus", "Email otomatis kedaluwarsa dalam ${EMAIL_TTL_DAYS} hari. Attachment dalam ${ATTACHMENT_TTL_DAYS} hari.")}
   ${featureCard("🌐", "Edge Network", "Dijalankan di 300+ lokasi global via Cloudflare Workers. Latensi < 50ms.")}
   ${featureCard("🎨", "Catppuccin", "Tema gelap/terang yang bisa kamu pilih. Preferensi tersimpan otomatis.")}
   </div>
@@ -201,8 +207,8 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
   <div style="display:grid;gap:0.75rem;">
   ${stepCard("01", "Buat nama inbox", "Ketik nama inbox kamu atau klik Generate Acak. Nama hanya bisa menggunakan huruf kecil (a–z), angka (0–9), dan tanda hubung.")}
   ${stepCard("02", "Bagikan alamat emailmu", `Gunakan alamat <code style='color:var(--accent)'>nama@${escapeHtml(currentDomain)}</code> saat mendaftar di layanan yang ingin kamu coba.`)}
-  ${stepCard("03", "Terima email", "Email akan muncul otomatis di inboxmu. Tidak perlu refresh — halaman akan update sendiri.")}
-  ${stepCard("04", "Selesai", "Email dan attachment akan otomatis dihapus setelah 7–8 hari. Atau kamu bisa hapus manual kapan saja.")}
+  ${stepCard("03", "Terima email", "Email akan muncul otomatis di inboxmu. Tidak perlu refresh — halaman akan update tiap ${POLL_INTERVAL_SEC} detik.")}
+  ${stepCard("04", "Selesai", "Email dan attachment akan otomatis dihapus setelah ${EMAIL_TTL_DAYS}–${ATTACHMENT_TTL_DAYS} hari. Atau kamu bisa hapus manual kapan saja.")}
   </div>
   </div>
   `;
@@ -284,6 +290,7 @@ export function renderHomePage({ domains = [], defaultDomain = "", domain = "" }
     head,
     body,
     brandDomain: currentDomain,
+    emailTtlDays: EMAIL_TTL_DAYS,
   });
 
   // Inject JS — including domain list for client-side

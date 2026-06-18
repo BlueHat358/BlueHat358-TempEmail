@@ -3,9 +3,10 @@
 
 import { baseLayout, escapeHtml } from "../theme.js";
 import { formatDate, formatBytes, timeAgo, formatExpiry, isExpiringSoon } from "../utils.js";
+import { EMAIL_TTL_DAYS, MAX_ATTACHMENT_SIZE_MB } from "../config.js";
 
 export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
-  const currentDomain = domain || "bluehat358.biz.id";
+  const currentDomain = domain || "bluehat358.eu.cc";
   const emailAddr = `${inboxName}@${currentDomain}`;
   const hasHtml = !!email.htmlBody;
   const hasText = !!email.body;
@@ -209,6 +210,7 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
     head,
     body,
     brandDomain: currentDomain,
+    emailTtlDays: EMAIL_TTL_DAYS,
   });
 
   const htmlBodyEscaped = hasHtml
@@ -297,7 +299,7 @@ function renderAttachmentRow(att) {
         </div>
       </div>
       <span class="badge" style="background:var(--surface1);color:var(--red);">
-        ⚠️ Terlalu besar (maks 10 MB)
+        ⚠️ Terlalu besar (maks ${MAX_ATTACHMENT_SIZE_MB} MB)
       </span>
     </div>`;
   }

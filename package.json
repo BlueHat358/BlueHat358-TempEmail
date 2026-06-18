@@ -1,7 +1,7 @@
 {
   "name": "bluehat358-tempmail",
   "version": "3.0.0",
-  "description": "BlueHat358 Temporary Email Service — Cloudflare Workers (Fase 3)",
+  "description": "BlueHat358 Temporary Email Service — Cloudflare Workers",
   "main": "src/index.js",
   "scripts": {
     "dev":    "wrangler dev",

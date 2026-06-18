@@ -18,15 +18,6 @@ bucket_name = "bluehat358-attachments"
 [triggers]
 crons = ["0 * * * *"]
 
-# ─── Durable Objects (Fase 3) — SSE real-time broker ───────────────────────
-[[durable_objects.bindings]]
-name       = "INBOX_BROADCASTER"
-class_name = "InboxBroadcaster"
-
-[[migrations]]
-tag         = "v1"
-new_sqlite_classes = ["InboxBroadcaster"]
-
 # ─── Domain Configuration ─────────────────────────────────────────────────
 # Daftar domain yang didukung (dipisah spasi/koma).
 # Bisa diatur via:
@@ -34,7 +25,7 @@ new_sqlite_classes = ["InboxBroadcaster"]
 #   2) Atau tambahkan [vars] section di bawah ini (uncomment):
 #
 [vars]
-DOMAIN_LIST = "bluehat358.biz.id,bluehat358.ccwu.cc,darkrail.kdns.fr"
+DOMAIN_LIST = "bluehat358.eu.cc,bluehat358.ccwu.cc,bluehat358.pp.ua"
 #
 # Domain pertama akan menjadi default. User bisa memilih domain
 # lain via dropdown select box di halaman utama.
@@ -43,5 +34,5 @@ DOMAIN_LIST = "bluehat358.biz.id,bluehat358.ccwu.cc,darkrail.kdns.fr"
 # ─── Email Routing ────────────────────────────────────────────────────────
 # Konfigurasi via Cloudflare Dashboard:
 #   Email → Email Routing → Routes → Add route:
-#   Pattern: *@bluehat358.biz.id → Worker: bluehat358-tempmail
+#   Pattern: *@bluehat358.eu.cc → Worker: bluehat358-tempmail
 #   (Buat route terpisah untuk setiap domain tambahan)

@@ -1,7 +1,14 @@
 // src/email-handler.js — Email ingestion via Cloudflare Email Routing
-// Fase 3: broadcast SSE event ke InboxBroadcaster Durable Object setelah simpan email
 
 import PostalMime from "postal-mime";
+import {
+  MAX_ATTACHMENT_SIZE,
+  MAX_EMAILS_PER_INBOX,
+  MAX_TOTAL_INBOXES,
+  EMAIL_TTL_DAYS,
+  ATTACHMENT_TTL_DAYS,
+  STATS_TTL_DAYS,
+} from "./config.js";
 import {
   isValidInboxName,
   sanitizeInboxName,
@@ -13,20 +20,6 @@ import {
   deleteEmail,
 } from "./utils.js";
 
-// ─────────────────────────────────────────────
-// Limit personal — konservatif & aman
-// ─────────────────────────────────────────────
-const MAX_ATTACHMENT_SIZE  = 3 * 1024 * 1024; // 3 MB per file  (was 10 MB)
-const MAX_EMAILS_PER_INBOX = 20;              // 20 email/inbox  (was 50)
-const MAX_TOTAL_INBOXES    = 10;              // max 10 inbox berbeda di seluruh sistem
-const EMAIL_TTL_DAYS       = 3;              // email expired 3 hari (was 7)
-const ATTACHMENT_TTL_DAYS  = 4;              // attachment R2 expired 4 hari (was 8)
-const STATS_TTL_DAYS       = 14;             // stats expired 14 hari (was 30)
-
-// Estimasi worst case dengan limit ini:
-// 10 inbox × 20 email × 3 MB = 600 MB R2 — sangat jauh dari 5 GB
-// ─────────────────────────────────────────────
-
 /**
  * Main email() handler — dipanggil oleh Cloudflare Email Routing
  */
@@ -35,13 +28,12 @@ export async function handleIncomingEmail(message, env, ctx) {
 
   try {
     // ── 1. Extract & validate inbox name ──────────────────────────────
-    const toAddress  = message.to || "";
-    const atIdx      = toAddress.indexOf("@");
-    const localPart  = atIdx > -1 ? toAddress.slice(0, atIdx) : toAddress;
-    const domainPart = atIdx > -1 ? toAddress.slice(atIdx + 1) : "";
+    const toAddress   = message.to || "";
+    const atIdx       = toAddress.indexOf("@");
+    const localPart   = atIdx > -1 ? toAddress.slice(0, atIdx) : toAddress;
+    const domainPart  = atIdx > -1 ? toAddress.slice(atIdx + 1) : "";
     const sanitizedLocal  = sanitizeInboxName(localPart);
     const sanitizedDomain = domainPart.toLowerCase().trim();
-    // inboxName menyertakan domain agar darkrail@domain-a ≠ darkrail@domain-b
     inboxName = sanitizedDomain ? `${sanitizedLocal}@${sanitizedDomain}` : sanitizedLocal;
 
     if (!isValidInboxName(inboxName)) {
@@ -50,15 +42,12 @@ export async function handleIncomingEmail(message, env, ctx) {
     }
 
     // ── 2. Global inbox count check ───────────────────────────────────
-    // Cek apakah inbox ini baru & sudah ada terlalu banyak inbox
     const existingEmails = await listEmailRecords(env, inboxName);
     if (existingEmails.length === 0) {
-      // Inbox kosong (baru atau semua pesannya sudah expired)
       const inboxCountKey = "system:inbox-count";
-      const countData = await env.EMAILS.get(inboxCountKey, { type: "json" });
-      let knownInboxes = countData?.inboxes || [];
+      const countData     = await env.EMAILS.get(inboxCountKey, { type: "json" });
+      let knownInboxes    = countData?.inboxes || [];
 
-      // Bersihkan alamat yang semua pesannya sudah expired dari daftar
       const activeChecks = await Promise.all(
         knownInboxes.map(async (name) => {
           const msgs = await listEmailRecords(env, name);
@@ -75,15 +64,13 @@ export async function handleIncomingEmail(message, env, ctx) {
         knownInboxes.push(inboxName);
       }
 
-      // Simpan ulang daftar yang sudah dibersihkan
       await env.EMAILS.put(inboxCountKey, JSON.stringify({ inboxes: knownInboxes }), {
         expirationTtl: STATS_TTL_DAYS * 24 * 60 * 60,
       });
     }
 
-    // ── 3. Per-inbox quota check — FIFO, hapus pesan terlama jika penuh ──
+    // ── 3. Per-inbox quota check — FIFO ──────────────────────────────
     if (existingEmails.length >= MAX_EMAILS_PER_INBOX) {
-      // existingEmails sudah diurutkan terbaru dulu, jadi terlama ada di akhir
       const oldest = existingEmails[existingEmails.length - 1];
       await deleteEmail(env, inboxName, oldest.id);
       console.log(`[email] FIFO: dropped oldest message ${oldest.id} from "${inboxName}"`);
@@ -106,26 +93,26 @@ export async function handleIncomingEmail(message, env, ctx) {
       emailId = emailId + "-" + Math.random().toString(36).substring(2, 7);
     }
 
-    const receivedAt   = Date.now();
-    const expiresAt    = receivedAt + EMAIL_TTL_DAYS * 24 * 60 * 60 * 1000;
-    const emailTtlSec  = EMAIL_TTL_DAYS * 24 * 60 * 60;
-    const attTtlSec    = ATTACHMENT_TTL_DAYS * 24 * 60 * 60;
+    const receivedAt  = Date.now();
+    const expiresAt   = receivedAt + EMAIL_TTL_DAYS * 24 * 60 * 60 * 1000;
+    const emailTtlSec = EMAIL_TTL_DAYS * 24 * 60 * 60;
+    const attTtlSec   = ATTACHMENT_TTL_DAYS * 24 * 60 * 60;
 
     // ── 6. Process attachments ────────────────────────────────────────
     const attachmentMetas = [];
 
     for (const att of parsed.attachments || []) {
-      const attId        = generateAttachmentId();
-      const content      = att.content;
-      const size         = content ? content.byteLength : 0;
-      const filename     = att.filename || "unnamed";
-      const contentType  = att.mimeType || "application/octet-stream";
+      const attId       = generateAttachmentId();
+      const content     = att.content;
+      const size        = content ? content.byteLength : 0;
+      const filename    = att.filename || "unnamed";
+      const contentType = att.mimeType || "application/octet-stream";
       const attExpiresAt = receivedAt + ATTACHMENT_TTL_DAYS * 24 * 60 * 60 * 1000;
 
       const meta = { id: attId, filename, contentType, size, expiresAt: attExpiresAt, skipped: false };
 
       if (size > MAX_ATTACHMENT_SIZE) {
-        console.log(`[email] Attachment "${filename}" skipped (${(size/1024/1024).toFixed(1)} MB > ${MAX_ATTACHMENT_SIZE/1024/1024} MB limit)`);
+        console.log(`[email] Attachment "${filename}" skipped (${(size / 1024 / 1024).toFixed(1)} MB > ${MAX_ATTACHMENT_SIZE / 1024 / 1024} MB limit)`);
         meta.skipped = true;
       } else if (content) {
         await env.ATTACHMENTS.put(`att:${attId}`, content, {
@@ -162,49 +149,7 @@ export async function handleIncomingEmail(message, env, ctx) {
 
     console.log(`[email] Saved ${emailId} to "${inboxName}" (${rawBuffer.byteLength} bytes, ${attachmentMetas.length} att)`);
 
-    // ── 9. Broadcast SSE via Durable Object ──────────────────────────
-    ctx.waitUntil(broadcastNewEmail(env, inboxName, emailRecord));
-
   } catch (err) {
     console.error(`[email] Unhandled error for inbox "${inboxName}":`, err);
-  }
-}
-
-async function broadcastNewEmail(env, inboxName, emailRecord) {
-  if (!env.INBOX_BROADCASTER) return;
-  try {
-    const doId  = env.INBOX_BROADCASTER.idFromName(`broadcast:${inboxName}`);
-    const stub  = env.INBOX_BROADCASTER.get(doId);
-    const stats = await env.EMAILS.get(`stats:${inboxName}`, { type: "json" });
-    const unread = stats?.unread ?? 1;
-
-    await stub.fetch("https://do-internal/broadcast", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "new-email",
-        data: { id: emailRecord.id, from: emailRecord.from, subject: emailRecord.subject, receivedAt: emailRecord.receivedAt, unread },
-      }),
-    });
-  } catch (err) {
-    console.warn(`[email] SSE broadcast failed for "${inboxName}":`, err);
-  }
-}
-
-export async function broadcastEmailDeleted(env, inboxName, emailId) {
-  if (!env.INBOX_BROADCASTER) return;
-  try {
-    const doId  = env.INBOX_BROADCASTER.idFromName(`broadcast:${inboxName}`);
-    const stub  = env.INBOX_BROADCASTER.get(doId);
-    const stats = await env.EMAILS.get(`stats:${inboxName}`, { type: "json" });
-    const unread = stats?.unread ?? 0;
-
-    await stub.fetch("https://do-internal/broadcast", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "email-deleted", data: { id: emailId, unread } }),
-    });
-  } catch (err) {
-    console.warn(`[email] SSE delete-broadcast failed for "${inboxName}":`, err);
   }
 }
