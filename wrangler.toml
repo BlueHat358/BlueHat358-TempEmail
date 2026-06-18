@@ -5,13 +5,13 @@ compatibility_flags = ["nodejs_compat"]
 
 # ─── KV Namespace ───────────────────────────────────────────────────────────
 [[kv_namespaces]]
-binding = "EMAILS"
+binding = "TEMP-EMAILS"
 id      = "GANTI_DENGAN_KV_NAMESPACE_ID"
 # preview_id = "PREVIEW_KV_NAMESPACE_ID"   # uncomment setelah buat preview KV
 
 # ─── R2 Bucket ──────────────────────────────────────────────────────────────
 [[r2_buckets]]
-binding     = "ATTACHMENTS"
+binding     = "TEMP-ATTACHMENTS"
 bucket_name = "bluehat358-attachments"
 
 # ─── Cron Trigger — cleanup R2 expired tiap jam ────────────────────────────

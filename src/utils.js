@@ -113,12 +113,12 @@ export const KV_KEYS = {
  */
 export async function listEmailRecords(env, inboxName, limit = 100) {
   const prefix = KV_KEYS.emailPrefix(inboxName);
-  const listed = await env.EMAILS.list({ prefix, limit });
+  const listed = await env.TEMP-EMAILS.list({ prefix, limit });
   if (!listed.keys.length) return [];
 
   // Fetch all records in parallel
   const promises = listed.keys.map((k) =>
-    env.EMAILS.get(k.name, { type: "json" })
+    env.TEMP-EMAILS.get(k.name, { type: "json" })
   );
   const records = await Promise.all(promises);
 
@@ -133,7 +133,7 @@ export async function listEmailRecords(env, inboxName, limit = 100) {
  */
 export async function getEmailRecord(env, inboxName, emailId) {
   const key = KV_KEYS.email(inboxName, emailId);
-  return env.EMAILS.get(key, { type: "json" });
+  return env.TEMP-EMAILS.get(key, { type: "json" });
 }
 
 /**
@@ -141,7 +141,7 @@ export async function getEmailRecord(env, inboxName, emailId) {
  */
 export async function saveEmailRecord(env, record, ttlSec) {
   const key = KV_KEYS.email(record.inboxName, record.id);
-  await env.EMAILS.put(key, JSON.stringify(record), {
+  await env.TEMP-EMAILS.put(key, JSON.stringify(record), {
     expirationTtl: ttlSec,
   });
 }
@@ -178,7 +178,7 @@ export async function markAllEmailsRead(env, inboxName) {
     const key = KV_KEYS.stats(inboxName);
     const stats = await getStats(env, inboxName);
     stats.unread = 0;
-    await env.EMAILS.put(key, JSON.stringify(stats), {
+    await env.TEMP-EMAILS.put(key, JSON.stringify(stats), {
       expirationTtl: 1209600, // 14 hari
     });
   }
@@ -196,13 +196,13 @@ export async function deleteEmail(env, inboxName, emailId) {
   // Delete attachments from R2 and KV
   for (const att of record.attachments || []) {
     if (!att.skipped) {
-      await env.ATTACHMENTS.delete(`att:${att.id}`).catch(() => {});
+      await env.TEMP-ATTACHMENTS.delete(`att:${att.id}`).catch(() => {});
     }
-    await env.EMAILS.delete(KV_KEYS.attachment(att.id)).catch(() => {});
+    await env.TEMP-EMAILS.delete(KV_KEYS.attachment(att.id)).catch(() => {});
   }
 
   // Delete email record
-  await env.EMAILS.delete(KV_KEYS.email(inboxName, emailId));
+  await env.TEMP-EMAILS.delete(KV_KEYS.email(inboxName, emailId));
 
   // Update stats
   await updateStatsOnDelete(env, inboxName, record.read ? 0 : 1);
@@ -215,23 +215,23 @@ export async function deleteEmail(env, inboxName, emailId) {
  */
 export async function deleteAllEmails(env, inboxName) {
   const prefix = KV_KEYS.emailPrefix(inboxName);
-  const listed = await env.EMAILS.list({ prefix, limit: 100 });
+  const listed = await env.TEMP-EMAILS.list({ prefix, limit: 100 });
 
   for (const kv of listed.keys) {
-    const record = await env.EMAILS.get(kv.name, { type: "json" });
+    const record = await env.TEMP-EMAILS.get(kv.name, { type: "json" });
     if (!record) continue;
     for (const att of record.attachments || []) {
       if (!att.skipped) {
-        await env.ATTACHMENTS.delete(`att:${att.id}`).catch(() => {});
+        await env.TEMP-ATTACHMENTS.delete(`att:${att.id}`).catch(() => {});
       }
-      await env.EMAILS.delete(KV_KEYS.attachment(att.id)).catch(() => {});
+      await env.TEMP-EMAILS.delete(KV_KEYS.attachment(att.id)).catch(() => {});
     }
-    await env.EMAILS.delete(kv.name);
+    await env.TEMP-EMAILS.delete(kv.name);
   }
 
   // Reset stats
   const statsKey = KV_KEYS.stats(inboxName);
-  await env.EMAILS.put(
+  await env.TEMP-EMAILS.put(
     statsKey,
     JSON.stringify({ inboxName, total: 0, unread: 0, lastUpdated: Date.now() }),
     { expirationTtl: 1209600 }
@@ -243,7 +243,7 @@ export async function deleteAllEmails(env, inboxName) {
 // ─────────────────────────────────────────────
 export async function getStats(env, inboxName) {
   const key = KV_KEYS.stats(inboxName);
-  const stats = await env.EMAILS.get(key, { type: "json" });
+  const stats = await env.TEMP-EMAILS.get(key, { type: "json" });
   return stats || { inboxName, total: 0, unread: 0, lastUpdated: 0 };
 }
 
@@ -253,7 +253,7 @@ export async function incrementStats(env, inboxName) {
   stats.total += 1;
   stats.unread += 1;
   stats.lastUpdated = Date.now();
-  await env.EMAILS.put(key, JSON.stringify(stats), {
+  await env.TEMP-EMAILS.put(key, JSON.stringify(stats), {
     expirationTtl: 1209600, // 14 hari
   });
 }
@@ -262,7 +262,7 @@ async function decrementUnread(env, inboxName) {
   const key = KV_KEYS.stats(inboxName);
   const stats = await getStats(env, inboxName);
   stats.unread = Math.max(0, stats.unread - 1);
-  await env.EMAILS.put(key, JSON.stringify(stats), {
+  await env.TEMP-EMAILS.put(key, JSON.stringify(stats), {
     expirationTtl: 1209600, // 14 hari
   });
 }
@@ -272,7 +272,7 @@ async function updateStatsOnDelete(env, inboxName, unreadDelta) {
   const stats = await getStats(env, inboxName);
   stats.total = Math.max(0, stats.total - 1);
   stats.unread = Math.max(0, stats.unread - unreadDelta);
-  await env.EMAILS.put(key, JSON.stringify(stats), {
+  await env.TEMP-EMAILS.put(key, JSON.stringify(stats), {
     expirationTtl: 1209600, // 14 hari
   });
 }
