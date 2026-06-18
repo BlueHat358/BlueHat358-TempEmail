@@ -6,8 +6,10 @@ import { formatDate, formatBytes, timeAgo, formatExpiry, isExpiringSoon } from "
 import { EMAIL_TTL_DAYS, MAX_ATTACHMENT_SIZE_MB } from "../config.js";
 
 export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
-  const currentDomain = domain || "bluehat358.eu.cc";
-  const emailAddr = `${inboxName}@${currentDomain}`;
+  const currentDomain = domain || "bluehat358.biz.id";
+  // inboxName bisa berupa "dark@bluehat358.eu.cc" atau hanya "dark"
+  const localPart = inboxName.includes("@") ? inboxName.split("@")[0] : inboxName;
+  const emailAddr = `${localPart}@${currentDomain}`;
   const hasHtml = !!email.htmlBody;
   const hasText = !!email.body;
   const hasAtt = email.attachments && email.attachments.length > 0;
@@ -31,7 +33,7 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
     ">
       <a href="/">Beranda</a>
       <span style="color:var(--overlay)">›</span>
-      <a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}">${escapeHtml(emailAddr)}</a>
+      <a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}">${escapeHtml(emailAddr)}</a>
       <span style="color:var(--overlay)">›</span>
       <span style="color:var(--text)">Email</span>
     </div>
@@ -49,7 +51,7 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;">
           <h1 style="font-size:1.3rem;line-height:1.35;flex:1;">${escapeHtml(email.subject)}</h1>
           <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-            <a href="/${encodeURIComponent(inboxName)}?domain=${encodeURIComponent(currentDomain)}" class="btn btn-sm btn-secondary">
+            <a href="/${encodeURIComponent(localPart)}?domain=${encodeURIComponent(currentDomain)}" class="btn btn-sm btn-secondary">
               ← Kembali
             </a>
             <button class="btn btn-sm btn-danger" onclick="deleteThisEmail()">🗑️ Hapus</button>
@@ -220,7 +222,8 @@ export function renderEmailDetailPage(inboxName, email, { domain = "" } = {}) {
   return page.replace(
     "</body>",
     `<script>
-var INBOX = '${escapeHtml(inboxName)}';
+var INBOX = '${escapeHtml(inboxName)}';   // full name untuk API
+var INBOX_LOCAL = '${escapeHtml(localPart)}'; // local part untuk URL
 var EMAIL_ID = '${escapeHtml(email.id)}';
 var DOMAIN = '${escapeHtml(currentDomain)}';
 
@@ -256,7 +259,7 @@ window.deleteThisEmail = function deleteThisEmail() {
         if (r.ok) {
           showToast('Email dihapus', 'success');
           setTimeout(function() {
-            window.location.href = '/' + INBOX + '?domain=' + encodeURIComponent(DOMAIN);
+            window.location.href = '/' + INBOX_LOCAL + '?domain=' + encodeURIComponent(DOMAIN);
           }, 800);
         } else {
           showToast('Gagal menghapus', 'error');
